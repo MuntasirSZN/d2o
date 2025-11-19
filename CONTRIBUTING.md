@@ -10,25 +10,29 @@ This project adheres to the Contributor Covenant [Code of Conduct](./CODE_OF_CON
 
 ### Prerequisites
 
-- Rust 1.70 or later
+- Rust 1.85 or later
 - Cargo
 - Git
 
 ### Development Setup
 
 1. Fork the repository
-2. Clone your fork:
+
+1. Clone your fork:
+
    ```bash
-   git clone https://github.com/YOUR_USERNAME/hcl.git
+   git clone https://github.com/MuntasirSZN/hcl.git
    cd hcl
    ```
 
-3. Add upstream remote:
+1. Add upstream remote:
+
    ```bash
-   git remote add upstream https://github.com/hcl.git
+   git remote add upstream https://github.com/MuntasirSZN/hcl.git
    ```
 
-4. Create a development branch:
+1. Create a development branch:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -70,6 +74,7 @@ cargo clippy -- -D warnings
 - Include edge cases in tests
 
 Example test structure:
+
 ```rust
 #[cfg(test)]
 mod tests {
@@ -106,7 +111,7 @@ mod tests {
 - Use clear, descriptive commit messages
 - Reference issues when applicable: `Fixes #123`
 - Keep commits focused on a single change
-- Use conventional commits when possible:
+- Use [conventional commits](https://conventionalcommits.org) when possible:
   ```
   feat: add new parser for tool X
   fix: correct option deduplication bug
@@ -120,19 +125,22 @@ mod tests {
 ### Before Submitting
 
 1. Update your branch with upstream:
+
    ```bash
    git fetch upstream
    git rebase upstream/main
    ```
 
-2. Run the full test suite:
+1. Run the full test suite:
+
    ```bash
    cargo test
    cargo clippy -- -D warnings
    cargo fmt -- --check
    ```
 
-3. Build the release binary:
+1. Build the release binary:
+
    ```bash
    cargo build --release
    ```
@@ -167,34 +175,20 @@ Fixes #(issue number)
 
 ## Areas for Contribution
 
-### High Priority
-- [ ] Performance optimizations
-- [ ] Additional help text format support
-- [ ] More comprehensive testing
-- [ ] Documentation improvements
-
-### Medium Priority
-- [ ] Support for more bioinformatics tools
-- [ ] Better error messages
-- [ ] Unicode edge cases
-- [ ] Platform-specific issues
-
-### Nice to Have
-- [ ] Shell integration scripts
-- [ ] Alternative output formats
-- [ ] Caching mechanisms
-- [ ] Interactive mode
+See [TODO.md](./TODO.md) for a list of features and improvements needed.
 
 ## Performance Considerations
 
 When optimizing:
+
 1. Measure before/after with real commands
-2. Use `cargo flamegraph` for profiling
-3. Test memory usage with large help texts
-4. Consider regex complexity
-5. Benchmark against reference implementation
+1. Use `cargo flamegraph` for profiling
+1. Test memory usage with large help texts
+1. Consider regex complexity
+1. Benchmark against reference implementation
 
 Example:
+
 ```bash
 # Build with profiling
 cargo build --release
@@ -222,12 +216,13 @@ perf report
 ## Release Process
 
 The maintainers follow this process:
+
 1. Update version in Cargo.toml
-2. Update CHANGELOG.md
-3. Create git tag: `git tag v0.x.y`
-4. Push tag: `git push origin v0.x.y`
-5. GitHub Actions automatically builds and publishes binaries
-6. Create release notes on GitHub
+1. Update CHANGELOG.md
+1. Create git tag: `git tag v0.x.y`
+1. Push tag: `git push origin v0.x.y`
+1. GitHub Actions automatically builds and publishes binaries
+1. Create release notes on GitHub
 
 ## Security Issues
 
@@ -245,6 +240,7 @@ See [SECURITY.md](./SECURITY.md) for responsible disclosure procedures.
 ## Recognition
 
 Contributors will be recognized in:
+
 - GitHub contributors page
 - Release notes (for significant contributions)
 - Project documentation (for major features)
@@ -253,6 +249,6 @@ Contributors will be recognized in:
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
 
----
+______________________________________________________________________
 
 Thank you for helping make hcl better! 🚀

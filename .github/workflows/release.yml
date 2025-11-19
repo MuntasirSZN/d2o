@@ -1,13 +1,10 @@
 name: Release
-
 on:
   push:
     tags:
       - 'v*'
-
 env:
   RUST_BACKTRACE: 1
-
 jobs:
   build-matrix:
     name: Build ${{ matrix.build }}
@@ -35,26 +32,21 @@ jobs:
             os: windows-latest
             target: x86_64-pc-windows-msvc
             use_cross: false
-
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-
       - name: Setup rust toolchain
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           channel: stable
-
       - name: Install zig
         uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
         with:
           version: 0.15.2
-
       - name: Install cross (git)
         run: |
           if [ "${{ matrix.use_cross }}" == "true" ]; then
             cargo install cross --git https://github.com/cross-rs/cross
         shell: bash
-
       - name: Build
         run: |
           if [ "${{ matrix.use_cross }}" == "true" ]; then
@@ -63,7 +55,6 @@ jobs:
             cargo build --verbose --release --target ${{ matrix.target }}
           fi
         shell: bash
-
       - name: Create package (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -73,7 +64,6 @@ jobs:
           cp README.md LICENSE hcl-${{ matrix.build }}/
           tar -czf hcl-${{ matrix.build }}.tar.gz hcl-${{ matrix.build }}/
         shell: bash
-
       - name: Create package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -83,7 +73,6 @@ jobs:
           Copy-Item "completions", "man" "hcl-${{ matrix.build }}/" -Recurse -Force -ErrorAction SilentlyContinue
           Copy-Item "README.md", "LICENSE" "hcl-${{ matrix.build }}/"
           Compress-Archive -Path "hcl-${{ matrix.build }}" -DestinationPath "hcl-${{ matrix.build }}.zip" -Force
-
       - name: Upload artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -91,38 +80,31 @@ jobs:
           path: |
             hcl-${{ matrix.build }}.tar.gz
             hcl-${{ matrix.build }}.zip
-
   create-release:
     name: Create Release
     needs: build-matrix
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-
       - name: Download artifacts
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           path: artifacts
-
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
           find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release-assets/ \;
           ls -lh release-assets/
-
       - name: Install node
         uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: latest
-
       - name: Generate changelog
         id: changelog
         run: |
           npx changelogithub@latest > changelog.md
-
       - name: Create Release
         uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe # v2.4.2
         with:
@@ -130,21 +112,16 @@ jobs:
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   publish-crates-io:
     name: Publish to crates.io
     needs: create-release
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-
       - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
-
-      - uses: rust-lang/crates-io-auth-action@v1
+      - uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1.0.3
         id: auth
-
       - name: Publish
         run: cargo publish --token ${{ steps.auth.outputs.token }}

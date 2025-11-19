@@ -4,9 +4,7 @@
 
 If you discover a security vulnerability in hcl, please **do not** open a public GitHub issue.
 
-Instead, please email security details to:
-
-📧 **muntasir.joypurhat@gmail.com**
+Instead, please email security details to <muntasir.joypurhat@gmail.com>.
 
 ### What to Include
 
@@ -49,23 +47,10 @@ When using hcl:
    - hcl processes help text locally
    - No data is sent to external servers
 
-1. **File Permissions**: Protect generated completion scripts
-
-   ```bash
-   chmod 600 ~/.local/share/fish/vendor_completions.d/hcl.fish
-   ```
-
 1. **Command Execution**: Review commands before installation
 
    - hcl only reads command help text
    - It doesn't execute commands without explicit user action
-
-## Supported Versions
-
-| Version | Supported | Notes |
-|---------|-------------------|------------------------|
-| 0.1.x | ✅ Latest | Current release |
-| < 0.1.0 | ❌ Not supported | Please upgrade |
 
 ## Security Considerations
 

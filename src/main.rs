@@ -60,7 +60,7 @@ fn main() -> anyhow::Result<()> {
         "bash" => BashGenerator::generate(&cmd),
         "json" => JsonGenerator::generate(&cmd),
         "native" => format_native(&cmd),
-        _ => anyhow::bail!("Unknown output option")
+        _ => anyhow::bail!("Unknown output option"),
     };
 
     println!("{}", output);

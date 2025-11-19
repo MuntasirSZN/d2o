@@ -38,6 +38,14 @@ cargo install hcl
 cargo binstall hcl
 ```
 
+Completions are also available for `bash`, `zsh`, `fish`, `powershell`, `elvish` and `nushell`:
+
+```bash
+hcl --completions <shell> # Replace <shell> with your shell name
+```
+
+Manpages are in tarballs and zips in releases.
+
 ## Usage
 
 ### Generate shell completion
@@ -91,10 +99,6 @@ hcl --command ls --preprocess-only
 # Scan deeper for nested subcommands
 hcl --command docker --depth 2 --format json
 ```
-
-## Architecture
-
-## Development
 
 ### Building
 
