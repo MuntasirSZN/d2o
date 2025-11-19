@@ -89,9 +89,9 @@ fn get_input_content(cli: &Cli) -> anyhow::Result<String> {
             IoHandler::get_manpage(&format!("{}-{}", cmd, subcmd))?
         }
     } else {
-        return anyhow::bail!(
+        return Err(anyhow::anyhow!(
             "No input source specified. Use --command, --file, --subcommand, or --loadjson"
-        );
+        ));
     };
 
     Ok(Postprocessor::unicode_spaces_to_ascii(
