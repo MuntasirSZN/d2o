@@ -44,6 +44,41 @@ fn cli_file_native_output() {
         .stdout(predicate::str::contains("USAGE: mycmd [OPTIONS]"));
 }
 
+/// Verify --write caches output under ~/.hcl
+#[test]
+fn cli_write_caches_to_home_hcl() {
+    use std::io::Write;
+
+    let mut help_tmp = tempfile::NamedTempFile::new().expect("create temp help");
+    writeln!(
+        help_tmp,
+        "USAGE: cachecmd [OPTIONS]\n\nOPTIONS:\n  -v, --verbose  be verbose"
+    )
+    .unwrap();
+    let help_path = help_tmp.path().to_str().unwrap().to_string();
+
+    let home_dir = tempfile::TempDir::new().expect("create temp home");
+
+    let mut cmd = cargo_bin_cmd!("hcl");
+    let assert = cmd
+        .env("HOME", home_dir.path())
+        .args(["--file", &help_path, "--format", "bash", "--write"])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let stdout_trimmed = stdout.trim();
+
+    // Path printed should exist and be under $HOME/.hcl
+    let path = std::path::Path::new(stdout_trimmed);
+    assert!(path.exists());
+    assert!(
+        path.starts_with(home_dir.path().join(".hcl")),
+        "expected path under ~/.hcl, got {:?}",
+        path
+    );
+}
+
 /// Use the same help text but output JSON and ensure basic fields exist
 #[test]
 fn cli_file_json_output() {

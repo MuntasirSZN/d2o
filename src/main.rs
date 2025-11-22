@@ -69,10 +69,17 @@ fn main() -> anyhow::Result<()> {
         "native" => format_native(&cmd),
         _ => anyhow::bail!("Unknown output option"),
     };
-
-    println!("{}", output);
+ 
+    if cli.write {
+        let path = write_output_to_cache(&cmd, &format, &output)?;
+        println!("{}", path.display());
+    } else {
+        println!("{}", output);
+    }
+ 
     Ok(())
-}
+ }
+
 
 fn get_input_content(cli: &Cli) -> anyhow::Result<String> {
     let content = if let Some(json_file) = &cli.loadjson {
@@ -156,11 +163,11 @@ fn load_command_from_json(cli: &Cli) -> anyhow::Result<Command> {
 
 fn format_native(cmd: &Command) -> String {
     let mut output = Vec::new();
-
+ 
     output.push(format!("Name:  {}", cmd.name));
     output.push(format!("Desc:  {}", cmd.description));
     output.push(format!("Usage:\n{}", cmd.usage));
-
+ 
     for opt in &cmd.options {
         output.push(format!(
             "  {} ({})",
@@ -172,16 +179,41 @@ fn format_native(cmd: &Command) -> String {
             opt.argument
         ));
     }
-
+ 
     for subcmd in &cmd.subcommands {
         output.push(format!("Subcommand: {}", subcmd.name));
     }
-
+ 
     output.join("\n\n")
 }
-
+ 
+fn write_output_to_cache(
+    cmd: &Command,
+    format: &str,
+    output: &str,
+) -> anyhow::Result<std::path::PathBuf> {
+    use std::fs;
+    use std::path::PathBuf;
+ 
+    let home = std::env::var("HOME")
+        .map_err(|_| anyhow::anyhow!("HOME environment variable not set"))?;
+ 
+    let mut dir = PathBuf::from(home);
+    dir.push(".hcl");
+    fs::create_dir_all(&dir)?;
+ 
+    let file_name = format!("{}.{}", cmd.name, format);
+    let mut path = dir.clone();
+    path.push(file_name);
+ 
+    fs::write(&path, output)?;
+ 
+    Ok(path)
+}
+ 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]

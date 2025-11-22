@@ -3,7 +3,8 @@
 ## High Priority (Future Work)
 
 - [x] Add support for elvish and nushell in format
-- [ ] Add --write flag for caching completions to rc files (cli.rs) (used with -c just caches in ~/.hcl the output)
+- [x] Add --write flag for caching completions to ~/.hcl (cli.rs) (used with -c just caches in ~/.hcl the output)
+- [ ] Implement rc file append behavior for --write (auto-append to .bashrc/.zshrc/config.fish)
 - [x] Add more snapshot regression tests for generators and parser
 - [ ] Reach 90%+ coverage in cargo llvm-cov
 - [ ] Full h2o compatibility (100%) (https://github.com/yamaton/h2o.git)
