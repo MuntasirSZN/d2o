@@ -85,8 +85,14 @@ mod tests {
             usage: "test [OPTIONS]".to_string(),
             options: vec![crate::types::Opt {
                 names: vec![
-                    crate::types::OptName::new("-v".to_string(), crate::types::OptNameType::ShortType),
-                    crate::types::OptName::new("--verbose".to_string(), crate::types::OptNameType::LongType),
+                    crate::types::OptName::new(
+                        "-v".to_string(),
+                        crate::types::OptNameType::ShortType,
+                    ),
+                    crate::types::OptName::new(
+                        "--verbose".to_string(),
+                        crate::types::OptNameType::LongType,
+                    ),
                 ],
                 argument: "FILE".to_string(),
                 description: "Enable verbose mode".to_string(),

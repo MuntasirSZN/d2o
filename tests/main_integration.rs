@@ -5,11 +5,9 @@ use predicates::prelude::*;
 #[test]
 fn cli_errors_without_input_source() {
     let mut cmd = cargo_bin_cmd!("hcl");
-    cmd.assert()
-        .failure()
-        .stderr(predicate::str::contains(
-            "No input source specified. Use --command, --file, --subcommand, or --loadjson",
-        ));
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "No input source specified. Use --command, --file, --subcommand, or --loadjson",
+    ));
 }
 
 /// Smoke-test --help output
@@ -136,9 +134,7 @@ fn cli_list_subcommands_from_file() {
     cmd.args(["--file", &path, "--list-subcommands"])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("run").and(predicate::str::contains("build")),
-        );
+        .stdout(predicate::str::contains("run").and(predicate::str::contains("build")));
 }
 
 /// Test debug/preprocess-only mode using --file
@@ -147,11 +143,7 @@ fn cli_debug_preprocess_only() {
     use std::io::Write;
 
     let mut tmp = tempfile::NamedTempFile::new().expect("create temp help");
-    writeln!(
-        tmp,
-        "OPTIONS:\n  -v, --verbose  be verbose",
-    )
-    .unwrap();
+    writeln!(tmp, "OPTIONS:\n  -v, --verbose  be verbose",).unwrap();
     let path = tmp.path().to_str().unwrap().to_string();
 
     let mut cmd = cargo_bin_cmd!("hcl");
@@ -200,8 +192,5 @@ fn cli_loadjson_native_output() {
     cmd.args(["--loadjson", &path, "--format", "native"])
         .assert()
         .success()
-        .stdout(
-            predicate::str::contains("Name:  jsoncmd")
-                .and(predicate::str::contains("-v (")),
-        );
+        .stdout(predicate::str::contains("Name:  jsoncmd").and(predicate::str::contains("-v (")));
 }

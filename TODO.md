@@ -7,11 +7,11 @@
 - [x] Finalize --write design: user adds `source "$(hcl -c fzf --format zsh --write)"` (or similar) in rc files; hcl never auto-appends to rc files
 - [x] Add more snapshot regression tests for generators and parser
 - [x] Reach 90%+ coverage in cargo llvm-cov
-- [ ] Full h2o compatibility (100%) (https://github.com/yamaton/h2o.git)
+- [x] Full h2o compatibility (100%) (https://github.com/yamaton/h2o.git)
 - [x] Document --write usage pattern for rc files (no auto-append; user-managed source lines)
-- [ ] Caching mechanism with TTL (cache parsed help for N hours)
+- [x] Caching mechanism with TTL (cache parsed help for N hours)
 - [ ] Performance optimization for 100+ MB help text files
-- [ ] Parallel parsing for multiple commands using rayon
+- [x] Parallel parsing for multiple commands using rayon
 - [ ] Future roff parser (separate crate)
 - [ ] Async framework (tokio)
 - [ ] Asyncification
@@ -21,9 +21,9 @@
 ## Medium Priority
 
 - [x] Add -f short flag support for --file (if original supported)
-- [ ] Property-based testing with proptest
+- [x] Property-based testing with proptest
 - [ ] Stress tests with massive help text files
-- [ ] Performance benchmarking suite with criterion
+- [x] Performance benchmarking suite with criterion (using divan)
 
 ## Nice to Have
 

@@ -7,7 +7,9 @@ pub struct Command {
     pub description: String,
     pub usage: String,
     pub options: Vec<Opt>,
+    #[serde(default)]
     pub subcommands: Vec<Command>,
+    #[serde(default)]
     pub version: String,
 }
 
@@ -18,11 +20,38 @@ pub struct Opt {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash)]
 pub struct OptName {
     pub raw: String,
     #[serde(rename = "type")]
     pub opt_type: OptNameType,
+}
+
+impl<'de> Deserialize<'de> for OptName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum OptNameCompat {
+            Legacy(String),
+            Structured {
+                raw: String,
+                #[serde(rename = "type")]
+                opt_type: OptNameType,
+            },
+        }
+
+        match OptNameCompat::deserialize(deserializer)? {
+            OptNameCompat::Legacy(s) => {
+                let opt_type = OptName::determine_type(&s)
+                    .ok_or_else(|| serde::de::Error::custom("invalid option name"))?;
+                Ok(OptName { raw: s, opt_type })
+            }
+            OptNameCompat::Structured { raw, opt_type } => Ok(OptName { raw, opt_type }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]

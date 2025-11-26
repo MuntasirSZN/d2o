@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 82e2b2848403d3dab74e10e69c7bc54e997c3aa5f578e737c35073cd23706003 # shrinks to cmd = Command { name: "a", description: "", usage: "", options: [Opt { names: [OptName { raw: "-M", opt_type: ShortType }], argument: "NUM", description: "a" }, Opt { names: [OptName { raw: "-M", opt_type: ShortType }], argument: "", description: " " }], subcommands: [], version: "" }

@@ -1,23 +1,30 @@
 use crate::parser::Parser;
 use crate::types::Opt;
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 pub struct Layout;
 
 impl Layout {
+    /// Parse content into options, processing blocks in parallel.
     pub fn parse_blockwise(content: &str) -> Vec<Opt> {
         let blocks = Self::split_into_blocks(content);
+
+        // Use parallel iterator for processing multiple blocks
         blocks
-            .into_iter()
-            .flat_map(|block| Parser::parse_line(&block))
+            .par_iter()
+            .flat_map(|block| Parser::parse_line(block))
             .collect()
     }
 
+    /// Preprocess content into option/description pairs, processing blocks in parallel.
     pub fn preprocess_blockwise(content: &str) -> Vec<(String, String)> {
         let blocks = Self::split_into_blocks(content);
+
+        // Use parallel iterator for processing multiple blocks
         blocks
-            .into_iter()
-            .flat_map(|block| Parser::preprocess(&block))
+            .par_iter()
+            .flat_map(|block| Parser::preprocess(block))
             .collect()
     }
 

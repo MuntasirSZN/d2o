@@ -8,6 +8,12 @@ use std::path::PathBuf;
 include!("src/cli.rs");
 
 fn main() {
+    // Generate build-time metadata (including CLAP_LONG_VERSION)
+    shadow_rs::ShadowBuilder::builder()
+        .build_pattern(shadow_rs::BuildPattern::RealTime)
+        .build()
+        .expect("shadow-rs build failed");
+
     let out_dir = PathBuf::new().join("out");
     let mut cmd = Cli::command();
 

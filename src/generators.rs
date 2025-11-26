@@ -158,8 +158,7 @@ impl BashGenerator {
         ];
 
         let all_opts: Vec<String> = if bash_completion_compat {
-            cmd
-                .options
+            cmd.options
                 .iter()
                 .flat_map(|opt| {
                     let base_desc = FishGenerator::truncate_after_period(&opt.description);
@@ -189,8 +188,7 @@ impl BashGenerator {
                 .into_iter()
                 .collect()
         } else {
-            cmd
-                .options
+            cmd.options
                 .iter()
                 .flat_map(|opt| {
                     opt.names
