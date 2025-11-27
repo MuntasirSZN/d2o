@@ -1,16 +1,13 @@
 name: Benchmarks
-
 on:
   push:
     branches:
       - "main"
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
   id-token: write
-  
 jobs:
   benchmarks:
     name: Run benchmarks
@@ -25,8 +22,10 @@ jobs:
           channel: stable
           cache-target: release
           bins: cargo-codspeed
+      - name: Build the benchmark target(s)
+        run: cargo codspeed build
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
         with:
-          mode: instrumentation
+          mode: simulation
           run: cargo codspeed run
