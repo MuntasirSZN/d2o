@@ -1,28 +1,34 @@
+use ecow::{EcoString, EcoVec};
+use foldhash::quality::RandomState;
+use scc::{HashMap as SccHashMap, HashSet as SccHashSet};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
+pub type HashMap<K, V> = SccHashMap<K, V, RandomState>;
+pub type HashSet<T> = SccHashSet<T, RandomState>;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Command {
-    pub name: String,
-    pub description: String,
-    pub usage: String,
-    pub options: Vec<Opt>,
+    pub name: EcoString,
+    pub description: EcoString,
+    pub usage: EcoString,
+    pub options: EcoVec<Opt>,
     #[serde(default)]
-    pub subcommands: Vec<Command>,
+    pub subcommands: EcoVec<Command>,
     #[serde(default)]
-    pub version: String,
+    pub version: EcoString,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Opt {
-    pub names: Vec<OptName>,
-    pub argument: String,
-    pub description: String,
+    pub names: EcoVec<OptName>,
+    pub argument: EcoString,
+    pub description: EcoString,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash)]
 pub struct OptName {
-    pub raw: String,
+    pub raw: EcoString,
     #[serde(rename = "type")]
     pub opt_type: OptNameType,
 }
@@ -37,7 +43,7 @@ impl<'de> Deserialize<'de> for OptName {
         enum OptNameCompat {
             Legacy(String),
             Structured {
-                raw: String,
+                raw: EcoString,
                 #[serde(rename = "type")]
                 opt_type: OptNameType,
             },
@@ -47,7 +53,10 @@ impl<'de> Deserialize<'de> for OptName {
             OptNameCompat::Legacy(s) => {
                 let opt_type = OptName::determine_type(&s)
                     .ok_or_else(|| serde::de::Error::custom("invalid option name"))?;
-                Ok(OptName { raw: s, opt_type })
+                Ok(OptName {
+                    raw: EcoString::from(s),
+                    opt_type,
+                })
             }
             OptNameCompat::Structured { raw, opt_type } => Ok(OptName { raw, opt_type }),
         }
@@ -78,19 +87,19 @@ impl Ord for OptName {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Subcommand {
-    pub cmd: String,
-    pub desc: String,
+    pub cmd: EcoString,
+    pub desc: EcoString,
 }
 
 impl OptName {
-    pub fn new(raw: String, opt_type: OptNameType) -> Self {
+    pub fn new(raw: EcoString, opt_type: OptNameType) -> Self {
         Self { raw, opt_type }
     }
 
     pub fn from_text(s: &str) -> Option<Self> {
         let opt_type = Self::determine_type(s)?;
         Some(Self {
-            raw: s.to_string(),
+            raw: EcoString::from(s),
             opt_type,
         })
     }
@@ -118,7 +127,7 @@ impl std::fmt::Display for Opt {
         let names = self
             .names
             .iter()
-            .map(|n| n.raw.clone())
+            .map(|n| n.raw.to_string())
             .collect::<Vec<_>>()
             .join(" ");
         write!(
@@ -136,14 +145,14 @@ impl std::fmt::Display for Subcommand {
 }
 
 impl Command {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: EcoString) -> Self {
         Self {
             name,
-            description: String::new(),
-            usage: String::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-            version: String::new(),
+            description: EcoString::new(),
+            usage: EcoString::new(),
+            options: EcoVec::new(),
+            subcommands: EcoVec::new(),
+            version: EcoString::new(),
         }
     }
 
@@ -161,13 +170,13 @@ mod tests {
 
     #[test]
     fn test_command_new_and_as_subcommand() {
-        let mut cmd = Command::new("test".to_string());
-        assert_eq!(cmd.name, "test");
+        let mut cmd = Command::new(EcoString::from("test"));
+        assert_eq!(cmd.name.as_str(), "test");
         assert!(cmd.description.is_empty());
 
-        cmd.description = "Test command".to_string();
+        cmd.description = EcoString::from("Test command");
         let sub = cmd.as_subcommand();
-        assert_eq!(sub.cmd, "test");
-        assert_eq!(sub.desc, "Test command");
+        assert_eq!(sub.cmd.as_str(), "test");
+        assert_eq!(sub.desc.as_str(), "Test command");
     }
 }

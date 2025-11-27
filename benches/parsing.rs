@@ -4,13 +4,19 @@
 
 use divan::AllocProfiler;
 use divan::{Bencher, black_box};
+use ecow::{EcoString, EcoVec, eco_vec};
 use hcl::{
     BashGenerator, Command, ElvishGenerator, FishGenerator, JsonGenerator, Layout,
     NushellGenerator, Opt, OptName, OptNameType, Postprocessor, ZshGenerator,
 };
+use mimalloc_safe::MiMalloc;
 
+#[cfg(not(any(target_arch = "arm", target_os = "freebsd")))]
 #[global_allocator]
-static ALLOC: AllocProfiler = AllocProfiler::system();
+static ALLOC: AllocProfiler<MiMalloc> = AllocProfiler::new(MiMalloc);
+
+#[cfg(any(target_arch = "arm", target_os = "freebsd"))]
+static ALLOC: AllocProfiler = AllocProfilder::system();
 
 fn main() {
     divan::main();
@@ -73,92 +79,101 @@ fn sample_help_large() -> String {
 
 fn sample_command_small() -> Command {
     Command {
-        name: "mycmd".to_string(),
-        description: "A sample command".to_string(),
-        usage: "mycmd [OPTIONS]".to_string(),
-        options: vec![
+        name: EcoString::from("mycmd"),
+        description: EcoString::from("A sample command"),
+        usage: EcoString::from("mycmd [OPTIONS]"),
+        options: eco_vec![
             Opt {
-                names: vec![
-                    OptName::new("-h".to_string(), OptNameType::ShortType),
-                    OptName::new("--help".to_string(), OptNameType::LongType),
+                names: eco_vec![
+                    OptName::new(EcoString::from("-h"), OptNameType::ShortType),
+                    OptName::new(EcoString::from("--help"), OptNameType::LongType),
                 ],
-                argument: String::new(),
-                description: "Print help".to_string(),
+                argument: EcoString::new(),
+                description: EcoString::from("Print help"),
             },
             Opt {
-                names: vec![
-                    OptName::new("-v".to_string(), OptNameType::ShortType),
-                    OptName::new("--verbose".to_string(), OptNameType::LongType),
+                names: eco_vec![
+                    OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                    OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
                 ],
-                argument: String::new(),
-                description: "Verbose output".to_string(),
+                argument: EcoString::new(),
+                description: EcoString::from("Verbose output"),
             },
         ],
-        subcommands: Vec::new(),
-        version: "1.0.0".to_string(),
+        subcommands: eco_vec![],
+        version: EcoString::from("1.0.0"),
     }
 }
 
 fn sample_command_medium() -> Command {
-    let options: Vec<Opt> = (0..50)
+    let options: EcoVec<Opt> = (0..50)
         .map(|i| Opt {
-            names: vec![OptName::new(format!("--opt-{}", i), OptNameType::LongType)],
+            names: eco_vec![OptName::new(
+                EcoString::from(format!("--opt-{}", i)),
+                OptNameType::LongType
+            )],
             argument: if i % 3 == 0 {
-                "VALUE".to_string()
+                EcoString::from("VALUE")
             } else {
-                String::new()
+                EcoString::new()
             },
-            description: format!("Option number {}", i),
+            description: EcoString::from(format!("Option number {}", i)),
         })
         .collect();
 
-    let subcommands: Vec<Command> = (0..10)
+    let subcommands: EcoVec<Command> = (0..10)
         .map(|i| Command {
-            name: format!("sub{}", i),
-            description: format!("Subcommand {}", i),
-            usage: String::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-            version: String::new(),
+            name: EcoString::from(format!("sub{}", i)),
+            description: EcoString::from(format!("Subcommand {}", i)),
+            usage: EcoString::new(),
+            options: eco_vec![],
+            subcommands: eco_vec![],
+            version: EcoString::new(),
         })
         .collect();
 
     Command {
-        name: "mediumcmd".to_string(),
-        description: "A medium-sized command".to_string(),
-        usage: "mediumcmd [OPTIONS] [COMMAND]".to_string(),
+        name: EcoString::from("mediumcmd"),
+        description: EcoString::from("A medium-sized command"),
+        usage: EcoString::from("mediumcmd [OPTIONS] [COMMAND]"),
         options,
         subcommands,
-        version: "2.0.0".to_string(),
+        version: EcoString::from("2.0.0"),
     }
 }
 
 fn sample_command_large() -> Command {
-    let options: Vec<Opt> = (0..500)
+    let options: EcoVec<Opt> = (0..500)
         .map(|i| Opt {
-            names: vec![
+            names: eco_vec![
                 OptName::new(
-                    format!("-{}", (b'a' + (i % 26) as u8) as char),
+                    EcoString::from(format!("-{}", (b'a' + (i % 26) as u8) as char)),
                     OptNameType::ShortType,
                 ),
-                OptName::new(format!("--option-{}", i), OptNameType::LongType),
+                OptName::new(
+                    EcoString::from(format!("--option-{}", i)),
+                    OptNameType::LongType
+                ),
             ],
             argument: if i % 2 == 0 {
-                "ARG".to_string()
+                EcoString::from("ARG")
             } else {
-                String::new()
+                EcoString::new()
             },
-            description: format!("This is the description for option number {}", i),
+            description: EcoString::from(format!(
+                "This is the description for option number {}",
+                i
+            )),
         })
         .collect();
 
     Command {
-        name: "largecmd".to_string(),
-        description: "A large command with many options".to_string(),
-        usage: "largecmd [OPTIONS]".to_string(),
+        name: EcoString::from("largecmd"),
+        description: EcoString::from("A large command with many options"),
+        usage: EcoString::from("largecmd [OPTIONS]"),
         options,
-        subcommands: Vec::new(),
-        version: "3.0.0".to_string(),
+        subcommands: eco_vec![],
+        version: EcoString::from("3.0.0"),
     }
 }
 
@@ -434,34 +449,37 @@ fn sample_help_10mb() -> String {
 }
 
 fn sample_command_massive() -> Command {
-    let options: Vec<Opt> = (0..5000)
+    let options: EcoVec<Opt> = (0..5000)
         .map(|i| Opt {
-            names: vec![
+            names: eco_vec![
                 OptName::new(
-                    format!("-{}", (b'a' + (i % 26) as u8) as char),
+                    EcoString::from(format!("-{}", (b'a' + (i % 26) as u8) as char)),
                     OptNameType::ShortType,
                 ),
-                OptName::new(format!("--option-{}", i), OptNameType::LongType),
+                OptName::new(
+                    EcoString::from(format!("--option-{}", i)),
+                    OptNameType::LongType
+                ),
             ],
             argument: if i % 2 == 0 {
-                "ARG".to_string()
+                EcoString::from("ARG")
             } else {
-                String::new()
+                EcoString::new()
             },
-            description: format!(
+            description: EcoString::from(format!(
                 "This is the description for option number {} with additional context",
                 i
-            ),
+            )),
         })
         .collect();
 
     Command {
-        name: "massivecmd".to_string(),
-        description: "A massive command with thousands of options".to_string(),
-        usage: "massivecmd [OPTIONS]".to_string(),
+        name: EcoString::from("massivecmd"),
+        description: EcoString::from("A massive command with thousands of options"),
+        usage: EcoString::from("massivecmd [OPTIONS]"),
         options,
-        subcommands: Vec::new(),
-        version: "1.0.0".to_string(),
+        subcommands: eco_vec![],
+        version: EcoString::from("1.0.0"),
     }
 }
 

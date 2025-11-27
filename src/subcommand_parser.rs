@@ -1,11 +1,18 @@
 use crate::types::Subcommand;
+use bstr::ByteSlice;
+use ecow::{EcoString, EcoVec};
 use std::collections::BTreeSet;
 
 pub struct SubcommandParser;
 
 impl SubcommandParser {
-    pub fn parse(content: &str) -> Vec<Subcommand> {
-        let lines: Vec<&str> = content.lines().collect();
+    pub fn parse(content: &str) -> EcoVec<Subcommand> {
+        // Use bstr for SIMD-accelerated line iteration
+        let bytes = content.as_bytes();
+        let lines: Vec<&str> = bytes
+            .lines()
+            .filter_map(|line| std::str::from_utf8(line).ok())
+            .collect();
         let mut subcommands = BTreeSet::new();
 
         for window in lines.windows(2) {
@@ -25,8 +32,10 @@ impl SubcommandParser {
 
     fn parse_line_pair(first: &str, second: &str) -> Option<Subcommand> {
         let trimmed_first = first.trim();
+        let trimmed_bytes = trimmed_first.as_bytes();
 
-        if trimmed_first.is_empty() || trimmed_first.starts_with('-') {
+        // Fast path: skip empty or option lines using byte check
+        if trimmed_bytes.is_empty() || trimmed_bytes[0] == b'-' {
             return None;
         }
 
@@ -36,54 +45,77 @@ impl SubcommandParser {
             return None;
         }
 
-        let desc = second.trim().to_string();
+        let desc = second.trim();
+        let desc_bytes = desc.as_bytes();
 
-        if desc.is_empty() || desc.starts_with('-') {
+        // Fast path: skip empty or option descriptions
+        if desc_bytes.is_empty() || desc_bytes[0] == b'-' {
             return None;
         }
 
+        // Use memchr to find newline if present
+        let desc_line = match memchr::memchr(b'\n', desc_bytes) {
+            Some(pos) => &desc[..pos],
+            None => desc,
+        };
+
         Some(Subcommand {
-            cmd: first_word.to_string(),
-            desc: desc.split('\n').next().unwrap_or("").to_string(),
+            cmd: EcoString::from(first_word),
+            desc: EcoString::from(desc_line),
         })
     }
 
     fn parse_single_line(line: &str) -> Option<Subcommand> {
         let trimmed = line.trim();
+        let trimmed_bytes = trimmed.as_bytes();
 
-        if trimmed.is_empty() || trimmed.starts_with('-') {
+        // Fast path: skip empty or option lines using byte check
+        if trimmed_bytes.is_empty() || trimmed_bytes[0] == b'-' {
             return None;
         }
 
-        let parts: Vec<&str> = trimmed.split_whitespace().collect();
-        if parts.len() < 3 {
-            return None;
-        }
+        // Count whitespace-separated parts without allocating
+        let mut parts = trimmed.split_whitespace();
+        let name = parts.next()?;
 
-        let name = parts[0];
+        // Need at least 2 more words for description (total 3+)
+        let second = parts.next()?;
+        let third = parts.next();
+
+        third?;
+
         if !Self::is_valid_subcommand_name(name) {
             return None;
         }
 
-        let desc = parts[1..].join(" ");
-
-        if desc.is_empty() {
-            return None;
+        // Build description from remaining parts
+        let mut desc = EcoString::from(second);
+        desc.push(' ');
+        desc.push_str(third.unwrap());
+        for part in parts {
+            desc.push(' ');
+            desc.push_str(part);
         }
 
         Some(Subcommand {
-            cmd: name.to_string(),
+            cmd: EcoString::from(name),
             desc,
         })
     }
 
+    #[inline]
     fn is_valid_subcommand_name(name: &str) -> bool {
-        if name.starts_with('-') || name.is_empty() {
+        let bytes = name.as_bytes();
+
+        // Fast path: check first byte
+        if bytes.is_empty() || bytes[0] == b'-' {
             return false;
         }
 
-        name.chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        // SIMD-friendly byte iteration
+        bytes
+            .iter()
+            .all(|&b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
     }
 }
 
@@ -95,8 +127,8 @@ mod tests {
     fn test_parse_subcommands() {
         let content = "run       Run a command\nbuild     Build a project";
         let subs = SubcommandParser::parse(content);
-        assert!(subs.iter().any(|s| s.cmd == "run"));
-        assert!(subs.iter().any(|s| s.cmd == "build"));
+        assert!(subs.iter().any(|s| s.cmd.as_str() == "run"));
+        assert!(subs.iter().any(|s| s.cmd.as_str() == "build"));
     }
 
     #[test]

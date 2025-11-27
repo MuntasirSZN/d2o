@@ -1,13 +1,15 @@
 use crate::parser::Parser;
 use crate::types::Opt;
+use bstr::ByteSlice;
+use ecow::{EcoString, EcoVec};
+use memchr::memchr;
 use rayon::prelude::*;
-use std::collections::HashMap;
 
 pub struct Layout;
 
 impl Layout {
     /// Parse content into options, processing blocks in parallel.
-    pub fn parse_blockwise(content: &str) -> Vec<Opt> {
+    pub fn parse_blockwise(content: &str) -> EcoVec<Opt> {
         let blocks = Self::split_into_blocks_fast(content);
 
         // Use parallel iterator for processing multiple blocks
@@ -15,36 +17,55 @@ impl Layout {
         if blocks.len() > 4 {
             blocks
                 .par_iter()
-                .flat_map(|block| Parser::parse_line(block))
+                .flat_map(|block| {
+                    let opts = Parser::parse_line(block);
+                    opts.into_iter().collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
                 .collect()
         } else {
             blocks
                 .iter()
-                .flat_map(|block| Parser::parse_line(block))
+                .flat_map(|block| Parser::parse_line(block).into_iter())
                 .collect()
         }
     }
 
     /// Preprocess content into option/description pairs, processing blocks in parallel.
-    pub fn preprocess_blockwise(content: &str) -> Vec<(String, String)> {
+    pub fn preprocess_blockwise(content: &str) -> EcoVec<(EcoString, EcoString)> {
         let blocks = Self::split_into_blocks_fast(content);
 
         // Only parallelize if we have enough blocks
         if blocks.len() > 4 {
             blocks
                 .par_iter()
-                .flat_map(|block| Parser::preprocess(block))
+                .flat_map(|block| {
+                    let pairs = Parser::preprocess(block);
+                    pairs.into_iter().collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
                 .collect()
         } else {
             blocks
                 .iter()
-                .flat_map(|block| Parser::preprocess(block))
+                .flat_map(|block| Parser::preprocess(block).into_iter())
                 .collect()
         }
     }
 
-    pub fn parse_usage(content: &str) -> String {
+    pub fn parse_usage(content: &str) -> EcoString {
         let keywords = ["usage", "synopsis"];
+        let bytes = content.as_bytes();
+
+        // SIMD fast scan for 'u' or 's' (first chars of keywords)
+        if memchr(b'u', bytes).is_none() && memchr(b's', bytes).is_none() {
+            // Also check uppercase
+            if memchr(b'U', bytes).is_none() && memchr(b'S', bytes).is_none() {
+                return EcoString::new();
+            }
+        }
 
         // Fast scan for keywords first
         let lower = content.to_lowercase();
@@ -61,80 +82,117 @@ impl Layout {
         }
 
         if keyword_pos.is_none() {
-            return String::new();
+            return EcoString::new();
         }
 
-        let lines: Vec<&str> = content.lines().collect();
+        // Use bstr for SIMD-accelerated line iteration
+        let lines: Vec<&str> = bytes
+            .lines()
+            .filter_map(|line| std::str::from_utf8(line).ok())
+            .collect();
 
         for (i, line) in lines.iter().enumerate() {
             let lower = line.to_lowercase();
             if keywords.iter().any(|k| lower.contains(k)) && lower.contains(':') {
-                let usage_lines: Vec<&str> = lines[i..]
-                    .iter()
-                    .take_while(|l| !l.is_empty() && (l.starts_with(' ') || l.contains(':')))
-                    .copied()
-                    .collect();
+                let mut usage_result = String::with_capacity(256);
+                let mut first = true;
 
-                if !usage_lines.is_empty() {
-                    return usage_lines.join("\n");
+                for l in lines[i..].iter() {
+                    if (l.is_empty() || (!l.starts_with(' ') && !l.contains(':')))
+                        && !first {
+                            break;
+                        }
+                    if !first {
+                        usage_result.push('\n');
+                    }
+                    usage_result.push_str(l);
+                    first = false;
+                }
+
+                if !usage_result.is_empty() {
+                    return EcoString::from(usage_result);
                 }
             }
         }
 
-        String::new()
+        EcoString::new()
     }
 
     /// Optimized block splitting that minimizes allocations
-    fn split_into_blocks_fast(content: &str) -> Vec<String> {
-        let lines: Vec<&str> = content.lines().collect();
-        let mut blocks = Vec::with_capacity(lines.len() / 10 + 1);
-        let mut current_block = Vec::with_capacity(32);
+    /// Uses bstr for SIMD-accelerated line iteration
+    fn split_into_blocks_fast(content: &str) -> EcoVec<EcoString> {
+        let bytes = content.as_bytes();
 
-        for line in lines {
-            let trimmed = line.trim_start();
+        // SIMD fast path: check if '-' exists at all
+        if memchr(b'-', bytes).is_none() {
+            return EcoVec::new();
+        }
+
+        let mut blocks = EcoVec::new();
+        let mut current_block = String::with_capacity(256);
+        let mut in_block = false;
+
+        // Use bstr for SIMD-accelerated line iteration
+        for line in bytes.lines() {
+            // Safe conversion - content is already valid UTF-8
+            let line_str = unsafe { std::str::from_utf8_unchecked(line) };
+            let trimmed = line_str.trim_start();
 
             if trimmed.is_empty() {
-                if !current_block.is_empty() {
-                    blocks.push(current_block.join("\n"));
+                if in_block && !current_block.is_empty() {
+                    blocks.push(EcoString::from(current_block.as_str()));
                     current_block.clear();
+                    in_block = false;
                 }
-            } else if trimmed.starts_with('-') || !current_block.is_empty() {
-                current_block.push(line);
+            } else if trimmed.starts_with('-') || in_block {
+                if !current_block.is_empty() {
+                    current_block.push('\n');
+                }
+                current_block.push_str(line_str);
+                in_block = true;
             }
         }
 
         if !current_block.is_empty() {
-            blocks.push(current_block.join("\n"));
+            blocks.push(EcoString::from(current_block));
         }
 
         blocks
     }
 
-    pub fn get_option_offsets(s: &str) -> Vec<usize> {
+    pub fn get_option_offsets(s: &str) -> EcoVec<usize> {
         let short_offset = Self::get_short_option_offset(s);
         let long_offset = Self::get_long_option_offset(s);
 
+        let mut result = EcoVec::new();
         match (short_offset, long_offset) {
-            (None, None) => Vec::new(),
-            (None, Some(y)) => vec![y],
-            (Some(x), None) => vec![x],
+            (None, None) => {}
+            (None, Some(y)) => result.push(y),
+            (Some(x), None) => result.push(x),
             (Some(x), Some(y)) => {
                 if x == y {
-                    vec![x]
+                    result.push(x);
                 } else {
-                    vec![x, y]
+                    result.push(x);
+                    result.push(y);
                 }
             }
         }
+        result
     }
 
-    fn get_option_locations(s: &str, predicate: fn(&str) -> bool) -> Vec<(usize, usize)> {
-        s.lines()
+    fn get_option_locations(s: &str, predicate: fn(&str) -> bool) -> EcoVec<(usize, usize)> {
+        let bytes = s.as_bytes();
+
+        // Use bstr for SIMD-accelerated line iteration
+        bytes
+            .lines()
             .enumerate()
             .filter_map(|(i, line)| {
-                let trimmed = line.trim_start();
+                let line_str = std::str::from_utf8(line).ok()?;
+                let trimmed = line_str.trim_start();
                 if !trimmed.is_empty() && predicate(trimmed) {
-                    let offset = line.len() - trimmed.len();
+                    let offset = line_str.len() - trimmed.len();
                     Some((i, offset))
                 } else {
                     None
@@ -159,9 +217,10 @@ impl Layout {
             return None;
         }
 
-        let mut freq_map = HashMap::new();
+        // Use a simple local HashMap instead of concurrent one for this single-threaded operation
+        let mut freq_map = std::collections::HashMap::with_capacity(locations.len());
         for (_, offset) in locations {
-            *freq_map.entry(*offset).or_insert(0) += 1;
+            *freq_map.entry(*offset).or_insert(0usize) += 1;
         }
 
         freq_map

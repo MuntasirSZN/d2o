@@ -1,5 +1,7 @@
-use crate::types::{Command, Opt};
-use memchr::memmem;
+use crate::types::{Command, Opt, OptName};
+use bstr::ByteSlice;
+use ecow::{EcoString, EcoVec};
+use memchr::memchr;
 use std::collections::HashSet;
 
 pub struct Postprocessor;
@@ -13,30 +15,26 @@ impl Postprocessor {
         cmd
     }
 
-    fn deduplicate_options(options: Vec<Opt>) -> Vec<Opt> {
-        let mut seen = HashSet::new();
-        let mut result = Vec::with_capacity(options.len());
-
-        for opt in options {
-            let key = (
-                opt.names
-                    .iter()
-                    .map(|n| n.raw.clone())
-                    .collect::<Vec<_>>()
-                    .join("|"),
-                opt.argument.clone(),
+    fn deduplicate_options(options: EcoVec<Opt>) -> EcoVec<Opt> {
+        // Deduplicate based on (names, argument) - description is not part of the key
+        let mut seen: HashSet<(EcoVec<OptName>, EcoString), foldhash::fast::RandomState> =
+            HashSet::with_capacity_and_hasher(
+                options.len(),
+                foldhash::fast::RandomState::default(),
             );
+        let mut result = EcoVec::new();
 
-            if !seen.contains(&key) {
-                seen.insert(key);
-                result.push(opt);
+        for opt in options.iter() {
+            let key = (opt.names.clone(), opt.argument.clone());
+            if seen.insert(key) {
+                result.push(opt.clone());
             }
         }
 
         result
     }
 
-    fn filter_invalid_options(options: Vec<Opt>) -> Vec<Opt> {
+    fn filter_invalid_options(options: EcoVec<Opt>) -> EcoVec<Opt> {
         options
             .into_iter()
             .filter(|opt| {
@@ -45,81 +43,112 @@ impl Postprocessor {
             .collect()
     }
 
-    pub fn remove_bullets(text: &str) -> String {
+    pub fn remove_bullets(text: &str) -> EcoString {
+        let bytes = text.as_bytes();
+
+        // SIMD fast path: check if any bullet characters exist
+        // Bullets we care about: '*' (0x2A), '-' (0x2D), '•' (0xE2 0x80 0xA2)
+        let has_asterisk = memchr(b'*', bytes).is_some();
+        let has_dash = memchr(b'-', bytes).is_some();
+        let has_bullet_utf8 = memchr(0xE2, bytes).is_some();
+
+        if !has_asterisk && !has_dash && !has_bullet_utf8 {
+            return EcoString::from(text);
+        }
+
         // Pre-allocate with capacity hint
         let mut result = String::with_capacity(text.len());
         let mut first = true;
 
-        for line in text.lines() {
+        // Use bstr for fast line iteration (SIMD-accelerated newline search)
+        for line in bytes.lines() {
             if !first {
                 result.push('\n');
             }
             first = false;
 
-            let trimmed = line.trim_start();
-            let prefix_len = line.len() - trimmed.len();
-            let bytes = trimmed.as_bytes();
+            // Safe: we know bytes came from valid UTF-8
+            let line_str = unsafe { std::str::from_utf8_unchecked(line) };
+            let trimmed = line_str.trim_start();
+            let prefix_len = line_str.len() - trimmed.len();
+            let trimmed_bytes = trimmed.as_bytes();
 
             // Fast path: check first byte for bullet characters
-            if bytes.len() >= 2 {
-                let is_bullet = match bytes[0] {
-                    b'*' | b'-' => bytes[1].is_ascii_whitespace(),
+            if trimmed_bytes.len() >= 2 {
+                let is_bullet = match trimmed_bytes[0] {
+                    b'*' | b'-' => trimmed_bytes[1].is_ascii_whitespace(),
                     // UTF-8 bullet point (•) starts with 0xE2
-                    0xE2 if bytes.len() >= 4 && bytes[1] == 0x80 && bytes[2] == 0xA2 => {
-                        bytes[3].is_ascii_whitespace()
+                    0xE2 if trimmed_bytes.len() >= 4
+                        && trimmed_bytes[1] == 0x80
+                        && trimmed_bytes[2] == 0xA2 =>
+                    {
+                        trimmed_bytes[3].is_ascii_whitespace()
                     }
                     _ => false,
                 };
 
                 if is_bullet {
-                    result.push_str(&line[..prefix_len]);
+                    result.push_str(&line_str[..prefix_len]);
                     // Skip bullet and whitespace
-                    let skip = if bytes[0] == 0xE2 { 4 } else { 2 };
+                    let skip = if trimmed_bytes[0] == 0xE2 { 4 } else { 2 };
                     result.push_str(trimmed[skip..].trim_start());
                     continue;
                 }
             }
-            result.push_str(line);
+            result.push_str(line_str);
         }
 
-        result
+        EcoString::from(result)
     }
 
-    pub fn unicode_spaces_to_ascii(text: &str) -> String {
-        // Fast path: if no unicode spaces found, return borrowed string
-        let nbsp = "\u{00A0}";
-        let em_space = "\u{2003}";
-        let en_space = "\u{2002}";
+    pub fn unicode_spaces_to_ascii(text: &str) -> EcoString {
+        let bytes = text.as_bytes();
 
-        let has_nbsp = memmem::find(text.as_bytes(), nbsp.as_bytes()).is_some();
-        let has_em = memmem::find(text.as_bytes(), em_space.as_bytes()).is_some();
-        let has_en = memmem::find(text.as_bytes(), en_space.as_bytes()).is_some();
+        // SIMD fast path: scan for any high bytes using memchr
+        // All unicode spaces we care about have bytes >= 0x80
+        // Use memchr to find first high byte - this is SIMD accelerated
+        if memchr::memchr(0x80, bytes).is_none()
+            && memchr::memchr(0xC2, bytes).is_none()
+            && memchr::memchr(0xE2, bytes).is_none()
+        {
+            // Pure ASCII - no unicode spaces possible
+            return EcoString::from(text);
+        }
 
-        if !has_nbsp && !has_em && !has_en {
-            return text.to_string();
+        // Check if any of our target characters exist using a single pass
+        let has_targets = text.chars().any(|c| {
+            matches!(
+                c,
+                '\u{00A0}' | '\u{2002}' | '\u{2003}' | '\u{2009}' | '\u{202F}'
+            )
+        });
+
+        if !has_targets {
+            return EcoString::from(text);
         }
 
         // Pre-allocate result
-        let mut result = String::with_capacity(text.len());
+        let mut result = String::with_capacity(text.len() + text.len() / 8);
 
         for c in text.chars() {
             match c {
-                '\u{00A0}' => result.push(' '),
-                '\u{2003}' => result.push_str("   "),
-                '\u{2002}' => result.push_str("  "),
+                '\u{00A0}' | '\u{202F}' => result.push(' '), // NBSP, Narrow NBSP
+                '\u{2009}' => result.push(' '),              // Thin space
+                '\u{2002}' => result.push_str("  "),         // En space
+                '\u{2003}' => result.push_str("   "),        // Em space
                 _ => result.push(c),
             }
         }
 
-        result
+        EcoString::from(result)
     }
 
-    pub fn convert_tabs_to_spaces(text: &str, spaces: usize) -> String {
-        // Fast path: no tabs
-        if !text.contains('\t') {
-            return text.to_string();
+    pub fn convert_tabs_to_spaces(text: &str, spaces: usize) -> EcoString {
+        // SIMD fast path: use memchr to check for tabs
+        if memchr(b'\t', text.as_bytes()).is_none() {
+            return EcoString::from(text);
         }
-        text.replace('\t', &" ".repeat(spaces))
+        EcoString::from(text.replace('\t', &" ".repeat(spaces)))
     }
 }
 
@@ -128,21 +157,29 @@ mod tests {
     use super::*;
     use crate::OptName;
     use crate::types::OptNameType;
+    use ecow::EcoString;
 
     #[test]
     fn test_deduplicate_options() {
-        let opts = vec![
-            Opt {
-                names: vec![OptName::new("-v".to_string(), OptNameType::ShortType)],
-                argument: String::new(),
-                description: "verbose".to_string(),
+        let mut opts = EcoVec::new();
+        opts.push(Opt {
+            names: {
+                let mut v = EcoVec::new();
+                v.push(OptName::new(EcoString::from("-v"), OptNameType::ShortType));
+                v
             },
-            Opt {
-                names: vec![OptName::new("-v".to_string(), OptNameType::ShortType)],
-                argument: String::new(),
-                description: "verbose".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("verbose"),
+        });
+        opts.push(Opt {
+            names: {
+                let mut v = EcoVec::new();
+                v.push(OptName::new(EcoString::from("-v"), OptNameType::ShortType));
+                v
             },
-        ];
+            argument: EcoString::new(),
+            description: EcoString::from("verbose"),
+        });
 
         let result = Postprocessor::deduplicate_options(opts);
         assert_eq!(result.len(), 1);
@@ -162,7 +199,7 @@ mod tests {
         let ascii = Postprocessor::unicode_spaces_to_ascii(text);
 
         // Non-breaking/en-space/em-space should be replaced with ASCII spaces
-        assert_eq!(ascii, " foo  bar   baz\tend");
+        assert_eq!(ascii.as_str(), " foo  bar   baz\tend");
 
         let with_spaces = Postprocessor::convert_tabs_to_spaces(&ascii, 4);
         assert!(!with_spaces.contains('\t'));
@@ -172,31 +209,49 @@ mod tests {
     #[test]
     fn test_fix_command_filters_and_deduplicates() {
         let valid_opt = Opt {
-            names: vec![OptName::new("-v".to_string(), OptNameType::ShortType)],
-            argument: String::new(),
-            description: "verbose".to_string(),
+            names: {
+                let mut v = EcoVec::new();
+                v.push(OptName::new(EcoString::from("-v"), OptNameType::ShortType));
+                v
+            },
+            argument: EcoString::new(),
+            description: EcoString::from("verbose"),
         };
 
         let invalid_opt = Opt {
-            names: vec![],
-            argument: String::new(),
-            description: String::new(),
+            names: EcoVec::new(),
+            argument: EcoString::new(),
+            description: EcoString::new(),
         };
 
         let cmd = Command {
-            name: "root".to_string(),
-            description: String::new(),
-            usage: String::new(),
-            options: vec![valid_opt.clone(), valid_opt.clone(), invalid_opt],
-            subcommands: vec![Command {
-                name: "child".to_string(),
-                description: String::new(),
-                usage: String::new(),
-                options: vec![valid_opt.clone()],
-                subcommands: vec![],
-                version: String::new(),
-            }],
-            version: String::new(),
+            name: EcoString::from("root"),
+            description: EcoString::new(),
+            usage: EcoString::new(),
+            options: {
+                let mut v = EcoVec::new();
+                v.push(valid_opt.clone());
+                v.push(valid_opt.clone());
+                v.push(invalid_opt);
+                v
+            },
+            subcommands: {
+                let mut v = EcoVec::new();
+                v.push(Command {
+                    name: EcoString::from("child"),
+                    description: EcoString::new(),
+                    usage: EcoString::new(),
+                    options: {
+                        let mut opts = EcoVec::new();
+                        opts.push(valid_opt.clone());
+                        opts
+                    },
+                    subcommands: EcoVec::new(),
+                    version: EcoString::new(),
+                });
+                v
+            },
+            version: EcoString::new(),
         };
 
         let fixed = Postprocessor::fix_command(cmd);

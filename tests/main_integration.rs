@@ -1,4 +1,5 @@
 use assert_cmd::cargo::cargo_bin_cmd;
+use ecow::{EcoString, eco_vec};
 use predicates::prelude::*;
 
 /// Ensure running with no args shows clap error about missing input
@@ -168,19 +169,19 @@ fn cli_loadjson_native_output() {
     use std::io::Write;
 
     let cmd_struct = hcl::Command {
-        name: "jsoncmd".to_string(),
-        description: "Json command".to_string(),
-        usage: "jsoncmd [OPTIONS]".to_string(),
-        options: vec![hcl::types::Opt {
-            names: vec![hcl::types::OptName::new(
-                "-v".to_string(),
+        name: EcoString::from("jsoncmd"),
+        description: EcoString::from("Json command"),
+        usage: EcoString::from("jsoncmd [OPTIONS]"),
+        options: eco_vec![hcl::types::Opt {
+            names: eco_vec![hcl::types::OptName::new(
+                EcoString::from("-v"),
                 hcl::types::OptNameType::ShortType,
             )],
-            argument: String::new(),
-            description: "Verbose".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("Verbose"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let json = serde_json::to_string(&cmd_struct).unwrap();

@@ -3,6 +3,7 @@
 //! These tests verify invariants that should hold for any valid input,
 //! helping catch edge cases that unit tests might miss.
 
+use ecow::{EcoString, EcoVec, eco_vec};
 use hcl::{
     BashGenerator, Command, ElvishGenerator, FishGenerator, JsonGenerator, Layout,
     NushellGenerator, Opt, OptName, OptNameType, Postprocessor, ZshGenerator,
@@ -32,30 +33,30 @@ fn long_opt_name() -> impl Strategy<Value = String> {
 /// Generate a valid option name (short or long)
 fn opt_name_strategy() -> impl Strategy<Value = OptName> {
     prop_oneof![
-        short_opt_name().prop_map(|s| OptName::new(s, OptNameType::ShortType)),
-        long_opt_name().prop_map(|s| OptName::new(s, OptNameType::LongType)),
+        short_opt_name().prop_map(|s| OptName::new(EcoString::from(s), OptNameType::ShortType)),
+        long_opt_name().prop_map(|s| OptName::new(EcoString::from(s), OptNameType::LongType)),
     ]
 }
 
 /// Generate an argument placeholder (e.g., "FILE", "NUM", "<path>")
-fn arg_strategy() -> impl Strategy<Value = String> {
+fn arg_strategy() -> impl Strategy<Value = EcoString> {
     prop_oneof![
-        Just(String::new()),
-        Just("FILE".to_string()),
-        Just("NUM".to_string()),
-        Just("PATH".to_string()),
-        Just("<value>".to_string()),
-        "[a-zA-Z_]{1,10}".prop_map(|s| s.to_uppercase()),
+        Just(EcoString::new()),
+        Just(EcoString::from("FILE")),
+        Just(EcoString::from("NUM")),
+        Just(EcoString::from("PATH")),
+        Just(EcoString::from("<value>")),
+        "[a-zA-Z_]{1,10}".prop_map(|s| EcoString::from(s.to_uppercase())),
     ]
 }
 
 /// Generate a description string
-fn description_strategy() -> impl Strategy<Value = String> {
+fn description_strategy() -> impl Strategy<Value = EcoString> {
     prop_oneof![
-        Just(String::new()),
-        "[a-zA-Z ]{0,50}",
-        "Enable [a-z]+ mode",
-        "Set the [a-z]+ value",
+        Just(EcoString::new()),
+        "[a-zA-Z ]{0,50}".prop_map(EcoString::from),
+        "Enable [a-z]+ mode".prop_map(EcoString::from),
+        "Set the [a-z]+ value".prop_map(EcoString::from),
     ]
 }
 
@@ -67,7 +68,7 @@ fn opt_strategy() -> impl Strategy<Value = Opt> {
         description_strategy(),
     )
         .prop_map(|(names, argument, description)| Opt {
-            names,
+            names: names.into_iter().collect::<EcoVec<_>>(),
             argument,
             description,
         })
@@ -81,12 +82,12 @@ fn command_strategy() -> impl Strategy<Value = Command> {
         prop::collection::vec(opt_strategy(), 0..10), // options
     )
         .prop_map(|(name, description, options)| Command {
-            name,
-            description,
-            usage: String::new(),
-            options,
-            subcommands: Vec::new(),
-            version: String::new(),
+            name: EcoString::from(name),
+            description: EcoString::from(description),
+            usage: EcoString::new(),
+            options: options.into_iter().collect::<EcoVec<_>>(),
+            subcommands: eco_vec![],
+            version: EcoString::new(),
         })
 }
 
@@ -116,7 +117,7 @@ proptest! {
     #[test]
     fn optname_from_text_preserves_raw(name in short_opt_name()) {
         if let Some(opt_name) = OptName::from_text(&name) {
-            prop_assert_eq!(&opt_name.raw, &name);
+            prop_assert_eq!(opt_name.raw.as_str(), &name);
         }
     }
 
@@ -138,7 +139,7 @@ proptest! {
 
     #[test]
     fn optname_display_equals_raw(name in opt_name_strategy()) {
-        prop_assert_eq!(format!("{}", name), name.raw);
+        prop_assert_eq!(format!("{}", name), name.raw.as_str());
     }
 }
 
@@ -223,7 +224,7 @@ proptest! {
 
     #[test]
     fn all_generators_handle_empty_command(_seed in 0u64..1000) {
-        let cmd = Command::new("empty".to_string());
+        let cmd = Command::new(EcoString::from("empty"));
 
         // None of these should panic
         let _ = BashGenerator::generate(&cmd);
@@ -314,7 +315,7 @@ proptest! {
         let mut seen = std::collections::HashSet::new();
         for opt in &fixed.options {
             let key: (Vec<_>, &str) = (
-                opt.names.iter().map(|n| &n.raw).collect(),
+                opt.names.iter().map(|n| n.raw.as_str()).collect(),
                 &opt.argument,
             );
             prop_assert!(seen.insert(key), "Duplicate options should be removed");
@@ -332,17 +333,17 @@ proptest! {
     #[test]
     fn handles_unicode_in_descriptions(desc in "[\\p{L}\\p{N}\\s]{0,50}") {
         let opt = Opt {
-            names: vec![OptName::new("-u".to_string(), OptNameType::ShortType)],
-            argument: String::new(),
-            description: desc.clone(),
+            names: eco_vec![OptName::new(EcoString::from("-u"), OptNameType::ShortType)],
+            argument: EcoString::new(),
+            description: EcoString::from(desc.clone()),
         };
         let cmd = Command {
-            name: "unicode-test".to_string(),
-            description: String::new(),
-            usage: String::new(),
-            options: vec![opt],
-            subcommands: Vec::new(),
-            version: String::new(),
+            name: EcoString::from("unicode-test"),
+            description: EcoString::new(),
+            usage: EcoString::new(),
+            options: eco_vec![opt],
+            subcommands: eco_vec![],
+            version: EcoString::new(),
         };
 
         // All generators should handle unicode without panicking
@@ -363,17 +364,17 @@ proptest! {
     fn handles_very_long_descriptions(len in 100usize..1000) {
         let desc = "a".repeat(len);
         let opt = Opt {
-            names: vec![OptName::new("--long-desc".to_string(), OptNameType::LongType)],
-            argument: String::new(),
-            description: desc,
+            names: eco_vec![OptName::new(EcoString::from("--long-desc"), OptNameType::LongType)],
+            argument: EcoString::new(),
+            description: EcoString::from(desc),
         };
         let cmd = Command {
-            name: "long-test".to_string(),
-            description: String::new(),
-            usage: String::new(),
-            options: vec![opt],
-            subcommands: Vec::new(),
-            version: String::new(),
+            name: EcoString::from("long-test"),
+            description: EcoString::new(),
+            usage: EcoString::new(),
+            options: eco_vec![opt],
+            subcommands: eco_vec![],
+            version: EcoString::new(),
         };
 
         // Should handle long descriptions without issues
@@ -383,21 +384,21 @@ proptest! {
 
     #[test]
     fn handles_many_options(count in 50usize..200) {
-        let options: Vec<Opt> = (0..count)
+        let options: EcoVec<Opt> = (0..count)
             .map(|i| Opt {
-                names: vec![OptName::new(format!("--opt-{}", i), OptNameType::LongType)],
-                argument: String::new(),
-                description: format!("Option {}", i),
+                names: eco_vec![OptName::new(EcoString::from(format!("--opt-{}", i)), OptNameType::LongType)],
+                argument: EcoString::new(),
+                description: EcoString::from(format!("Option {}", i)),
             })
             .collect();
 
         let cmd = Command {
-            name: "many-opts".to_string(),
-            description: String::new(),
-            usage: String::new(),
+            name: EcoString::from("many-opts"),
+            description: EcoString::new(),
+            usage: EcoString::new(),
             options,
-            subcommands: Vec::new(),
-            version: String::new(),
+            subcommands: eco_vec![],
+            version: EcoString::new(),
         };
 
         // Should handle many options

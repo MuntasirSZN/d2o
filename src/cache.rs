@@ -7,8 +7,8 @@
 use crate::types::Command;
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
+use ecow::EcoString;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{debug, trace, warn};
@@ -86,7 +86,7 @@ impl Cache {
             ProjectDirs::from("", "", "hcl").context("Failed to determine project directories")?;
 
         let cache_dir = project_dirs.cache_dir().to_path_buf();
-        fs::create_dir_all(&cache_dir).with_context(|| {
+        std::fs::create_dir_all(&cache_dir).with_context(|| {
             format!("Failed to create cache directory: {}", cache_dir.display())
         })?;
 
@@ -95,11 +95,11 @@ impl Cache {
     }
 
     /// Generate a cache key from a command name and optional source identifier.
-    fn cache_key(name: &str, source: Option<&str>) -> String {
+    fn cache_key(name: &str, source: Option<&str>) -> EcoString {
         let sanitized_name = name.replace(['/', '\\', ':'], "_");
         match source {
-            Some(s) => format!("{}_{:016x}", sanitized_name, Self::hash_string(s)),
-            None => sanitized_name,
+            Some(s) => EcoString::from(format!("{}_{:016x}", sanitized_name, Self::hash_string(s))),
+            None => EcoString::from(sanitized_name),
         }
     }
 
@@ -127,13 +127,18 @@ impl Cache {
     ///
     /// Returns `Some(Command)` if a valid, non-expired cache entry exists
     /// that matches the content hash. Returns `None` otherwise.
-    pub fn get(&self, name: &str, source: Option<&str>, content_hash: u64) -> Option<Command> {
+    pub async fn get(
+        &self,
+        name: &str,
+        source: Option<&str>,
+        content_hash: u64,
+    ) -> Option<Command> {
         let key = Self::cache_key(name, source);
         let path = self.cache_path(&key);
 
         trace!("Looking for cache entry at: {}", path.display());
 
-        let data = match fs::read_to_string(&path) {
+        let data = match tokio::fs::read_to_string(&path).await {
             Ok(data) => data,
             Err(e) => {
                 trace!("Cache miss (read error): {}", e);
@@ -145,14 +150,14 @@ impl Cache {
             Ok(entry) => entry,
             Err(e) => {
                 warn!("Cache entry corrupted, removing: {}", e);
-                let _ = fs::remove_file(&path);
+                let _ = tokio::fs::remove_file(&path).await;
                 return None;
             }
         };
 
         if !entry.is_valid(self.ttl.as_secs()) {
             debug!("Cache entry expired for: {}", name);
-            let _ = fs::remove_file(&path);
+            let _ = tokio::fs::remove_file(&path).await;
             return None;
         }
 
@@ -166,7 +171,7 @@ impl Cache {
     }
 
     /// Store a Command in the cache.
-    pub fn set(
+    pub async fn set(
         &self,
         name: &str,
         source: Option<&str>,
@@ -180,7 +185,8 @@ impl Cache {
         let data =
             serde_json::to_string_pretty(&entry).context("Failed to serialize cache entry")?;
 
-        fs::write(&path, data)
+        tokio::fs::write(&path, data)
+            .await
             .with_context(|| format!("Failed to write cache entry: {}", path.display()))?;
 
         debug!("Cached command: {} at {}", name, path.display());
@@ -188,13 +194,13 @@ impl Cache {
     }
 
     /// Clear all cache entries.
-    pub fn clear(&self) -> Result<usize> {
+    pub async fn clear(&self) -> Result<usize> {
         let mut count = 0;
-        for entry in fs::read_dir(&self.cache_dir)? {
-            let entry = entry?;
+        let mut entries = tokio::fs::read_dir(&self.cache_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "json") {
-                fs::remove_file(&path)?;
+                tokio::fs::remove_file(&path).await?;
                 count += 1;
             }
         }
@@ -203,17 +209,17 @@ impl Cache {
     }
 
     /// Remove expired cache entries.
-    pub fn prune(&self) -> Result<usize> {
+    pub async fn prune(&self) -> Result<usize> {
         let mut count = 0;
-        for entry in fs::read_dir(&self.cache_dir)? {
-            let entry = entry?;
+        let mut entries = tokio::fs::read_dir(&self.cache_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "json")
-                && let Ok(data) = fs::read_to_string(&path)
+                && let Ok(data) = tokio::fs::read_to_string(&path).await
                 && let Ok(cache_entry) = serde_json::from_str::<CacheEntry>(&data)
                 && !cache_entry.is_valid(self.ttl.as_secs())
             {
-                fs::remove_file(&path)?;
+                tokio::fs::remove_file(&path).await?;
                 count += 1;
             }
         }
@@ -222,21 +228,21 @@ impl Cache {
     }
 
     /// Get cache statistics.
-    pub fn stats(&self) -> Result<CacheStats> {
+    pub async fn stats(&self) -> Result<CacheStats> {
         let mut total = 0;
         let mut valid = 0;
         let mut expired = 0;
         let mut total_size = 0u64;
 
-        for entry in fs::read_dir(&self.cache_dir)? {
-            let entry = entry?;
+        let mut entries = tokio::fs::read_dir(&self.cache_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "json") {
                 total += 1;
-                if let Ok(metadata) = entry.metadata() {
+                if let Ok(metadata) = entry.metadata().await {
                     total_size += metadata.len();
                 }
-                if let Ok(data) = fs::read_to_string(&path)
+                if let Ok(data) = tokio::fs::read_to_string(&path).await
                     && let Ok(cache_entry) = serde_json::from_str::<CacheEntry>(&data)
                 {
                     if cache_entry.is_valid(self.ttl.as_secs()) {
@@ -291,6 +297,7 @@ impl std::fmt::Display for CacheStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ecow::EcoString;
     use tempfile::TempDir;
 
     fn test_cache(ttl_secs: u64) -> (Cache, TempDir) {
@@ -304,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_cache_entry_validity() {
-        let cmd = Command::new("test".to_string());
+        let cmd = Command::new(EcoString::from("test"));
         let entry = CacheEntry::new(cmd.clone(), 12345);
 
         // Should be valid with a long TTL
@@ -316,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_cache_entry_content_match() {
-        let cmd = Command::new("test".to_string());
+        let cmd = Command::new(EcoString::from("test"));
         let entry = CacheEntry::new(cmd, 12345);
 
         assert!(entry.matches_content(12345));
@@ -326,7 +333,7 @@ mod tests {
     #[test]
     fn test_cache_key_generation() {
         let key1 = Cache::cache_key("git", None);
-        assert_eq!(key1, "git");
+        assert_eq!(key1.as_str(), "git");
 
         let key2 = Cache::cache_key("git", Some("--help"));
         assert!(key2.starts_with("git_"));
@@ -339,13 +346,13 @@ mod tests {
         assert!(!key.contains('/'));
     }
 
-    #[test]
-    fn test_cache_roundtrip() {
+    #[tokio::test]
+    async fn test_cache_roundtrip() {
         let (cache, _temp) = test_cache(3600);
 
-        let mut cmd = Command::new("mycmd".to_string());
-        cmd.description = "My command".to_string();
-        cmd.usage = "mycmd [OPTIONS]".to_string();
+        let mut cmd = Command::new(EcoString::from("mycmd"));
+        cmd.description = EcoString::from("My command");
+        cmd.usage = EcoString::from("mycmd [OPTIONS]");
 
         let content = "USAGE: mycmd [OPTIONS]\n\n-v  verbose";
         let hash = Cache::hash_content(content);
@@ -353,74 +360,81 @@ mod tests {
         // Store
         cache
             .set("mycmd", Some("--help"), hash, &cmd)
+            .await
             .expect("cache set");
 
         // Retrieve
-        let cached = cache.get("mycmd", Some("--help"), hash);
+        let cached = cache.get("mycmd", Some("--help"), hash).await;
         assert!(cached.is_some());
         let cached = cached.unwrap();
-        assert_eq!(cached.name, "mycmd");
-        assert_eq!(cached.description, "My command");
+        assert_eq!(cached.name.as_str(), "mycmd");
+        assert_eq!(cached.description.as_str(), "My command");
     }
 
-    #[test]
-    fn test_cache_miss_on_content_change() {
+    #[tokio::test]
+    async fn test_cache_miss_on_content_change() {
         let (cache, _temp) = test_cache(3600);
 
-        let cmd = Command::new("mycmd".to_string());
+        let cmd = Command::new(EcoString::from("mycmd"));
         let content1 = "help text v1";
         let content2 = "help text v2";
         let hash1 = Cache::hash_content(content1);
         let hash2 = Cache::hash_content(content2);
 
-        cache.set("mycmd", None, hash1, &cmd).expect("cache set");
+        cache
+            .set("mycmd", None, hash1, &cmd)
+            .await
+            .expect("cache set");
 
         // Same hash should hit
-        assert!(cache.get("mycmd", None, hash1).is_some());
+        assert!(cache.get("mycmd", None, hash1).await.is_some());
 
         // Different hash should miss
-        assert!(cache.get("mycmd", None, hash2).is_none());
+        assert!(cache.get("mycmd", None, hash2).await.is_none());
     }
 
-    #[test]
-    fn test_cache_expiration() {
+    #[tokio::test]
+    async fn test_cache_expiration() {
         let (cache, _temp) = test_cache(0); // Zero TTL = immediate expiration
 
-        let cmd = Command::new("mycmd".to_string());
+        let cmd = Command::new(EcoString::from("mycmd"));
         let hash = 12345;
 
-        cache.set("mycmd", None, hash, &cmd).expect("cache set");
+        cache
+            .set("mycmd", None, hash, &cmd)
+            .await
+            .expect("cache set");
 
         // Should miss due to expiration
-        assert!(cache.get("mycmd", None, hash).is_none());
+        assert!(cache.get("mycmd", None, hash).await.is_none());
     }
 
-    #[test]
-    fn test_cache_clear() {
+    #[tokio::test]
+    async fn test_cache_clear() {
         let (cache, _temp) = test_cache(3600);
 
-        let cmd = Command::new("cmd".to_string());
-        cache.set("cmd1", None, 1, &cmd).expect("set 1");
-        cache.set("cmd2", None, 2, &cmd).expect("set 2");
-        cache.set("cmd3", None, 3, &cmd).expect("set 3");
+        let cmd = Command::new(EcoString::from("cmd"));
+        cache.set("cmd1", None, 1, &cmd).await.expect("set 1");
+        cache.set("cmd2", None, 2, &cmd).await.expect("set 2");
+        cache.set("cmd3", None, 3, &cmd).await.expect("set 3");
 
-        let cleared = cache.clear().expect("clear");
+        let cleared = cache.clear().await.expect("clear");
         assert_eq!(cleared, 3);
 
-        assert!(cache.get("cmd1", None, 1).is_none());
-        assert!(cache.get("cmd2", None, 2).is_none());
-        assert!(cache.get("cmd3", None, 3).is_none());
+        assert!(cache.get("cmd1", None, 1).await.is_none());
+        assert!(cache.get("cmd2", None, 2).await.is_none());
+        assert!(cache.get("cmd3", None, 3).await.is_none());
     }
 
-    #[test]
-    fn test_cache_stats() {
+    #[tokio::test]
+    async fn test_cache_stats() {
         let (cache, _temp) = test_cache(3600);
 
-        let cmd = Command::new("cmd".to_string());
-        cache.set("cmd1", None, 1, &cmd).expect("set");
-        cache.set("cmd2", None, 2, &cmd).expect("set");
+        let cmd = Command::new(EcoString::from("cmd"));
+        cache.set("cmd1", None, 1, &cmd).await.expect("set");
+        cache.set("cmd2", None, 2, &cmd).await.expect("set");
 
-        let stats = cache.stats().expect("stats");
+        let stats = cache.stats().await.expect("stats");
         assert_eq!(stats.total_entries, 2);
         assert_eq!(stats.valid_entries, 2);
         assert_eq!(stats.expired_entries, 0);

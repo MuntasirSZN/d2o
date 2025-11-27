@@ -2,6 +2,7 @@ use clap::{FromArgMatches, crate_name};
 use clap_complete::generate;
 use clap_complete::shells::{Bash, Elvish, Fish, PowerShell, Zsh};
 use clap_complete_nushell::Nushell;
+use ecow::EcoString;
 use hcl::{
     BashGenerator, Cache, Cli, Command, ElvishGenerator, FishGenerator, IoHandler, JsonGenerator,
     Layout, NushellGenerator, Postprocessor, Shell, SubcommandParser, ZshGenerator,
@@ -11,6 +12,10 @@ use std::io;
 use std::path::Path;
 use std::time::Duration;
 use tracing::debug;
+
+#[cfg(not(any(target_arch = "arm", target_os = "freebsd", target_family = "wasm")))]
+#[global_allocator]
+static ALLOC: mimalloc_safe::MiMalloc = mimalloc_safe::MiMalloc;
 
 fn init_tracing(cli: &Cli) {
     use tracing_subscriber::fmt;
@@ -24,7 +29,8 @@ fn init_tracing(cli: &Cli) {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let raw_args = std::env::args_os();
     let expanded_args =
         argfile::expand_args_from(raw_args, argfile::parse_fromfile, argfile::PREFIX)?;
@@ -57,12 +63,12 @@ fn main() -> anyhow::Result<()> {
         let cache = Cache::with_ttl(ttl)?;
 
         if cli.cache_clear {
-            let count = cache.clear()?;
+            let count = cache.clear().await?;
             println!("Cleared {} cache entries", count);
         }
 
         if cli.cache_stats {
-            let stats = cache.stats()?;
+            let stats = cache.stats().await?;
             println!("{}", stats);
         }
 
@@ -73,9 +79,9 @@ fn main() -> anyhow::Result<()> {
 
     // Handle preprocess only (debug mode)
     if cli.is_preprocess_only() {
-        let content = get_input_content(&cli)?;
+        let content = get_input_content(&cli).await?;
         let pairs = Layout::preprocess_blockwise(&content);
-        for (opt_part, desc) in pairs {
+        for (opt_part, desc) in pairs.iter() {
             println!("{}\n{}", opt_part, desc);
         }
         return Ok(());
@@ -83,9 +89,9 @@ fn main() -> anyhow::Result<()> {
 
     // Handle list subcommands
     if cli.list_subcommands {
-        let content = get_input_content(&cli)?;
+        let content = get_input_content(&cli).await?;
         let cmd = build_command(&cli, &content)?;
-        for subcmd in cmd.subcommands {
+        for subcmd in cmd.subcommands.iter() {
             println!("{}", subcmd.name);
         }
         return Ok(());
@@ -93,10 +99,10 @@ fn main() -> anyhow::Result<()> {
 
     // Normal processing with optional caching
     let cmd = if cli.loadjson.is_some() {
-        load_command_from_json(&cli)?
+        load_command_from_json(&cli).await?
     } else {
-        let content = get_input_content(&cli)?;
-        build_command_with_cache(&cli, &content)?
+        let content = get_input_content(&cli).await?;
+        build_command_with_cache(&cli, &content).await?
     };
 
     let output = match format.as_str() {
@@ -111,7 +117,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     if cli.write {
-        let path = write_output_to_cache(&cmd, &format, &output)?;
+        let path = write_output_to_cache(&cmd, &format, &output).await?;
         println!("{}", path.display());
     } else {
         println!("{}", output);
@@ -120,26 +126,26 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_input_content(cli: &Cli) -> anyhow::Result<String> {
+async fn get_input_content(cli: &Cli) -> anyhow::Result<EcoString> {
     let content = if let Some(json_file) = &cli.loadjson {
-        IoHandler::read_file(json_file)?
+        IoHandler::read_file(json_file).await?
     } else if let Some(file) = &cli.file {
-        IoHandler::read_file(file)?
+        IoHandler::read_file(file).await?
     } else if let Some(cmd_name) = &cli.command {
-        if cli.skip_man || !IoHandler::is_man_available(cmd_name) {
-            IoHandler::get_command_help(cmd_name)?
+        if cli.skip_man || !IoHandler::is_man_available(cmd_name).await {
+            IoHandler::get_command_help(cmd_name).await?
         } else {
-            IoHandler::get_manpage(cmd_name)?
+            IoHandler::get_manpage(cmd_name).await?
         }
     } else if let Some(subcommand) = &cli.subcommand {
         let (cmd, subcmd) = subcommand.split_once('-').ok_or_else(|| {
             anyhow::anyhow!("Subcommand format should be command-subcommand (e.g., git-log)")
         })?;
 
-        if cli.skip_man || !IoHandler::is_man_available(cmd) {
-            IoHandler::get_command_help(&format!("{} {}", cmd, subcmd))?
+        if cli.skip_man || !IoHandler::is_man_available(cmd).await {
+            IoHandler::get_command_help(&format!("{} {}", cmd, subcmd)).await?
         } else {
-            IoHandler::get_manpage(&format!("{}-{}", cmd, subcmd))?
+            IoHandler::get_manpage(&format!("{}-{}", cmd, subcmd)).await?
         }
     } else {
         return Err(anyhow::anyhow!(
@@ -154,17 +160,18 @@ fn get_input_content(cli: &Cli) -> anyhow::Result<String> {
 
 fn build_command(cli: &Cli, content: &str) -> anyhow::Result<Command> {
     let name = if let Some(cmd_name) = &cli.command {
-        cmd_name.clone()
+        EcoString::from(cmd_name.as_str())
     } else if let Some(file) = &cli.file {
-        Path::new(file)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("command")
-            .to_string()
+        EcoString::from(
+            Path::new(file)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("command"),
+        )
     } else if let Some(subcommand) = &cli.subcommand {
-        subcommand.clone()
+        EcoString::from(subcommand.as_str())
     } else {
-        "command".to_string()
+        EcoString::from("command")
     };
 
     let mut cmd = Command::new(name.clone());
@@ -173,14 +180,14 @@ fn build_command(cli: &Cli, content: &str) -> anyhow::Result<Command> {
 
     let subcommand_candidates = SubcommandParser::parse(content);
     if cli.depth > 0 && !subcommand_candidates.is_empty() {
-        for subcmd in subcommand_candidates {
+        for subcmd in subcommand_candidates.iter() {
             let sub = Command {
-                name: subcmd.cmd,
-                description: subcmd.desc,
-                usage: String::new(),
-                options: Vec::new(),
-                subcommands: Vec::new(),
-                version: String::new(),
+                name: subcmd.cmd.clone(),
+                description: subcmd.desc.clone(),
+                usage: EcoString::new(),
+                options: ecow::EcoVec::new(),
+                subcommands: ecow::EcoVec::new(),
+                version: EcoString::new(),
             };
             cmd.subcommands.push(sub);
         }
@@ -190,9 +197,7 @@ fn build_command(cli: &Cli, content: &str) -> anyhow::Result<Command> {
 }
 
 /// Build a command with caching support.
-/// If caching is enabled and a valid cache entry exists, return it.
-/// Otherwise, parse the content and cache the result.
-fn build_command_with_cache(cli: &Cli, content: &str) -> anyhow::Result<Command> {
+async fn build_command_with_cache(cli: &Cli, content: &str) -> anyhow::Result<Command> {
     // Determine command name for cache key
     let name = cli
         .command
@@ -223,7 +228,7 @@ fn build_command_with_cache(cli: &Cli, content: &str) -> anyhow::Result<Command>
         let ttl = Duration::from_secs(cli.cache_ttl * 3600);
         if let Ok(cache) = Cache::with_ttl(ttl) {
             // Try to get from cache
-            if let Some(cached_cmd) = cache.get(name, source, content_hash) {
+            if let Some(cached_cmd) = cache.get(name, source, content_hash).await {
                 debug!("Cache hit for command: {}", name);
                 return Ok(cached_cmd);
             }
@@ -234,7 +239,7 @@ fn build_command_with_cache(cli: &Cli, content: &str) -> anyhow::Result<Command>
             let cmd = Postprocessor::fix_command(cmd);
 
             // Store in cache (ignore errors, caching is best-effort)
-            if let Err(e) = cache.set(name, source, content_hash, &cmd) {
+            if let Err(e) = cache.set(name, source, content_hash, &cmd).await {
                 debug!("Failed to cache command: {}", e);
             }
 
@@ -247,70 +252,68 @@ fn build_command_with_cache(cli: &Cli, content: &str) -> anyhow::Result<Command>
     Ok(Postprocessor::fix_command(cmd))
 }
 
-fn load_command_from_json(cli: &Cli) -> anyhow::Result<Command> {
+async fn load_command_from_json(cli: &Cli) -> anyhow::Result<Command> {
     let json_file = cli
         .loadjson
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No JSON file specified"))?;
-    let content = IoHandler::read_file(json_file)?;
+    let content = IoHandler::read_file(json_file).await?;
     let mut cmd: Command = serde_json::from_str(&content)?;
     cmd = Postprocessor::fix_command(cmd);
     Ok(cmd)
 }
 
-fn format_native(cmd: &Command) -> String {
+fn format_native(cmd: &Command) -> EcoString {
     let mut output = Vec::new();
 
     output.push(format!("Name:  {}", cmd.name));
     output.push(format!("Desc:  {}", cmd.description));
     output.push(format!("Usage:\n{}", cmd.usage));
 
-    for opt in &cmd.options {
+    for opt in cmd.options.iter() {
         output.push(format!(
             "  {} ({})",
             opt.names
                 .iter()
-                .map(|n| n.raw.clone())
+                .map(|n| n.raw.to_string())
                 .collect::<Vec<_>>()
                 .join(", "),
             opt.argument
         ));
     }
 
-    for subcmd in &cmd.subcommands {
+    for subcmd in cmd.subcommands.iter() {
         output.push(format!("Subcommand: {}", subcmd.name));
     }
 
-    output.join("\n\n")
+    EcoString::from(output.join("\n\n"))
 }
 
-fn write_output_to_cache(
+async fn write_output_to_cache(
     cmd: &Command,
     format: &str,
     output: &str,
 ) -> anyhow::Result<std::path::PathBuf> {
-    use std::fs;
-
     let home = std::env::home_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
 
     let mut dir = home;
     dir.push(".hcl");
-    fs::create_dir_all(&dir)?;
+    tokio::fs::create_dir_all(&dir).await?;
 
     let file_name = format!("{}.{}", cmd.name, format);
     let mut path = dir.clone();
     path.push(file_name);
 
-    fs::write(&path, output)?;
+    tokio::fs::write(&path, output).await?;
 
     Ok(path)
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use ecow::EcoVec;
     use hcl::cli::DEFAULT_CACHE_TTL_HOURS;
 
     /// Helper to create a default Cli for testing
@@ -337,8 +340,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_get_input_content_from_file_and_error() {
+    #[tokio::test]
+    async fn test_get_input_content_from_file() {
         use std::io::Write;
 
         let mut tmp = tempfile::NamedTempFile::new().expect("create temp file");
@@ -354,34 +357,44 @@ mod tests {
             ..test_cli()
         };
 
-        let content = get_input_content(&cli).expect("get input from file");
+        let content = get_input_content(&cli).await.expect("get input from file");
         assert!(content.contains("USAGE: mycmd"));
+    }
 
+    #[tokio::test]
+    async fn test_get_input_content_error_no_source() {
         let cli_no_input = test_cli();
-
-        let err = get_input_content(&cli_no_input).unwrap_err();
+        let err = get_input_content(&cli_no_input).await.unwrap_err();
         let msg = format!("{}", err);
         assert!(msg.contains("No input source specified"));
     }
 
-    #[test]
-    fn test_load_command_from_json_roundtrip() {
+    #[tokio::test]
+    async fn test_load_command_from_json_roundtrip() {
         use std::io::Write;
 
         let cmd = Command {
-            name: "jsoncmd".to_string(),
-            description: "Json command".to_string(),
-            usage: "jsoncmd [OPTIONS]".to_string(),
-            options: vec![hcl::types::Opt {
-                names: vec![hcl::types::OptName::new(
-                    "-v".to_string(),
-                    hcl::types::OptNameType::ShortType,
-                )],
-                argument: String::new(),
-                description: "Verbose".to_string(),
-            }],
-            subcommands: vec![],
-            version: String::new(),
+            name: EcoString::from("jsoncmd"),
+            description: EcoString::from("Json command"),
+            usage: EcoString::from("jsoncmd [OPTIONS]"),
+            options: {
+                let mut v = EcoVec::new();
+                v.push(hcl::types::Opt {
+                    names: {
+                        let mut names = EcoVec::new();
+                        names.push(hcl::types::OptName::new(
+                            EcoString::from("-v"),
+                            hcl::types::OptNameType::ShortType,
+                        ));
+                        names
+                    },
+                    argument: EcoString::new(),
+                    description: EcoString::from("Verbose"),
+                });
+                v
+            },
+            subcommands: EcoVec::new(),
+            version: EcoString::new(),
         };
 
         let json = serde_json::to_string(&cmd).unwrap();
@@ -396,10 +409,10 @@ mod tests {
             ..test_cli()
         };
 
-        let loaded = load_command_from_json(&cli).expect("load from json");
-        assert_eq!(loaded.name, "jsoncmd");
+        let loaded = load_command_from_json(&cli).await.expect("load from json");
+        assert_eq!(loaded.name.as_str(), "jsoncmd");
         assert_eq!(loaded.options.len(), 1);
-        assert_eq!(loaded.options[0].description, "Verbose");
+        assert_eq!(loaded.options[0].description.as_str(), "Verbose");
     }
 
     #[test]
@@ -412,11 +425,11 @@ mod tests {
         let help = "USAGE: mycmd [OPTIONS]\n\nOPTIONS:\n  -v, --verbose   be verbose";
         let cmd = build_command(&cli, help).expect("build command");
 
-        assert_eq!(cmd.name, "mycmd");
+        assert_eq!(cmd.name.as_str(), "mycmd");
         assert!(cmd.usage.contains("mycmd"));
         assert_eq!(cmd.options.len(), 1);
         let opt = &cmd.options[0];
-        let names: Vec<String> = opt.names.iter().map(|n| n.raw.clone()).collect();
+        let names: Vec<String> = opt.names.iter().map(|n| n.raw.to_string()).collect();
         assert!(names.contains(&"-v".to_string()));
         assert!(names.contains(&"--verbose".to_string()));
     }
@@ -433,37 +446,42 @@ mod tests {
             "USAGE: mycmd [COMMAND]\n\nSUBCOMMANDS:\n  run   Run things\n  build Build things";
         let cmd = build_command(&cli, help).expect("build command");
 
-        assert_eq!(cmd.name, "mycmd-help.txt".to_string());
-        let names: Vec<String> = cmd.subcommands.iter().map(|s| s.name.clone()).collect();
+        assert_eq!(cmd.name.as_str(), "mycmd-help.txt");
+        let names: Vec<String> = cmd.subcommands.iter().map(|s| s.name.to_string()).collect();
         assert!(names.contains(&"run".to_string()));
         assert!(names.contains(&"build".to_string()));
     }
 
     #[test]
     fn test_format_native_includes_fields() {
-        let mut cmd = Command::new("test".to_string());
-        cmd.description = "Test command".to_string();
-        cmd.usage = "test [OPTIONS]".to_string();
+        let mut cmd = Command::new(EcoString::from("test"));
+        cmd.description = EcoString::from("Test command");
+        cmd.usage = EcoString::from("test [OPTIONS]");
 
         cmd.options.push(hcl::types::Opt {
-            names: vec![
-                hcl::types::OptName::new("-v".to_string(), hcl::types::OptNameType::ShortType),
-                hcl::types::OptName::new(
-                    "--verbose".to_string(),
+            names: {
+                let mut v = EcoVec::new();
+                v.push(hcl::types::OptName::new(
+                    EcoString::from("-v"),
+                    hcl::types::OptNameType::ShortType,
+                ));
+                v.push(hcl::types::OptName::new(
+                    EcoString::from("--verbose"),
                     hcl::types::OptNameType::LongType,
-                ),
-            ],
-            argument: "FILE".to_string(),
-            description: "Enable verbose mode".to_string(),
+                ));
+                v
+            },
+            argument: EcoString::from("FILE"),
+            description: EcoString::from("Enable verbose mode"),
         });
 
         cmd.subcommands.push(Command {
-            name: "sub".to_string(),
-            description: String::new(),
-            usage: String::new(),
-            options: Vec::new(),
-            subcommands: Vec::new(),
-            version: String::new(),
+            name: EcoString::from("sub"),
+            description: EcoString::new(),
+            usage: EcoString::new(),
+            options: EcoVec::new(),
+            subcommands: EcoVec::new(),
+            version: EcoString::new(),
         });
 
         let out = format_native(&cmd);
@@ -474,8 +492,8 @@ mod tests {
         assert!(out.contains("Subcommand: sub"));
     }
 
-    #[test]
-    fn test_build_command_with_cache_disabled() {
+    #[tokio::test]
+    async fn test_build_command_with_cache_disabled() {
         let cli = Cli {
             command: Some("testcmd".to_string()),
             cache: false,
@@ -483,14 +501,15 @@ mod tests {
         };
 
         let help = "USAGE: testcmd [OPTIONS]\n\nOPTIONS:\n  -v, --verbose  be verbose";
-        let cmd = build_command_with_cache(&cli, help).expect("build with cache disabled");
+        let cmd = build_command_with_cache(&cli, help)
+            .await
+            .expect("build with cache disabled");
 
-        assert_eq!(cmd.name, "testcmd");
-        // Command should be parsed (options may or may not be present depending on parser)
+        assert_eq!(cmd.name.as_str(), "testcmd");
     }
 
-    #[test]
-    fn test_build_command_with_cache_enabled() {
+    #[tokio::test]
+    async fn test_build_command_with_cache_enabled() {
         let cli = Cli {
             command: Some("cachedcmd".to_string()),
             cache: true,
@@ -501,12 +520,16 @@ mod tests {
         let help = "USAGE: cachedcmd [OPTIONS]\n\nOPTIONS:\n  -v, --verbose  be verbose";
 
         // First call should parse and cache
-        let cmd1 = build_command_with_cache(&cli, help).expect("first build");
-        assert_eq!(cmd1.name, "cachedcmd");
+        let cmd1 = build_command_with_cache(&cli, help)
+            .await
+            .expect("first build");
+        assert_eq!(cmd1.name.as_str(), "cachedcmd");
 
         // Second call with same content should hit cache
-        let cmd2 = build_command_with_cache(&cli, help).expect("second build");
-        assert_eq!(cmd2.name, "cachedcmd");
+        let cmd2 = build_command_with_cache(&cli, help)
+            .await
+            .expect("second build");
+        assert_eq!(cmd2.name.as_str(), "cachedcmd");
         assert_eq!(cmd1.options.len(), cmd2.options.len());
     }
 }

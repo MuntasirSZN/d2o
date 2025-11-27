@@ -1,4 +1,5 @@
 use clap::Parser as ClapParser;
+use ecow::{EcoString, eco_vec};
 use hcl::types::OptNameType;
 use hcl::{
     BashGenerator, Cli, Command, ElvishGenerator, FishGenerator, NushellGenerator, Opt, OptName,
@@ -21,19 +22,19 @@ OPTIONS:
 #[test]
 fn test_zsh_generator_with_descriptions_snapshot() {
     let cmd = Command {
-        name: "test".to_string(),
-        description: "Test command".to_string(),
-        usage: "test [OPTIONS]".to_string(),
-        options: vec![Opt {
-            names: vec![
-                OptName::new("-v".to_string(), OptNameType::ShortType),
-                OptName::new("--verbose".to_string(), OptNameType::LongType),
+        name: EcoString::from("test"),
+        description: EcoString::from("Test command"),
+        usage: EcoString::from("test [OPTIONS]"),
+        options: eco_vec![Opt {
+            names: eco_vec![
+                OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
             ],
-            argument: String::new(),
-            description: "Enable verbose mode".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("Enable verbose mode"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let output = ZshGenerator::generate(&cmd);
@@ -56,19 +57,19 @@ Options:
 #[test]
 fn test_elvish_generator_snapshot() {
     let cmd = Command {
-        name: "test".to_string(),
-        description: "Test command".to_string(),
-        usage: "test [OPTIONS]".to_string(),
-        options: vec![Opt {
-            names: vec![
-                OptName::new("-v".to_string(), OptNameType::ShortType),
-                OptName::new("--verbose".to_string(), OptNameType::LongType),
+        name: EcoString::from("test"),
+        description: EcoString::from("Test command"),
+        usage: EcoString::from("test [OPTIONS]"),
+        options: eco_vec![Opt {
+            names: eco_vec![
+                OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
             ],
-            argument: String::new(),
-            description: "Enable verbose mode".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("Enable verbose mode"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let output = ElvishGenerator::generate(&cmd);
@@ -78,19 +79,19 @@ fn test_elvish_generator_snapshot() {
 #[test]
 fn test_nushell_generator_snapshot() {
     let cmd = Command {
-        name: "test".to_string(),
-        description: "Test command".to_string(),
-        usage: "test [OPTIONS]".to_string(),
-        options: vec![Opt {
-            names: vec![
-                OptName::new("-v".to_string(), OptNameType::ShortType),
-                OptName::new("--verbose".to_string(), OptNameType::LongType),
+        name: EcoString::from("test"),
+        description: EcoString::from("Test command"),
+        usage: EcoString::from("test [OPTIONS]"),
+        options: eco_vec![Opt {
+            names: eco_vec![
+                OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
             ],
-            argument: String::new(),
-            description: "Enable verbose mode".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("Enable verbose mode"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let output = NushellGenerator::generate(&cmd);
@@ -127,19 +128,19 @@ fn test_cli_effective_format_and_helpers() {
 #[test]
 fn test_bash_generator_snapshot() {
     let cmd = Command {
-        name: "test".to_string(),
-        description: "Test command".to_string(),
-        usage: "test [OPTIONS]".to_string(),
-        options: vec![Opt {
-            names: vec![
-                OptName::new("-v".to_string(), OptNameType::ShortType),
-                OptName::new("--verbose".to_string(), OptNameType::LongType),
+        name: EcoString::from("test"),
+        description: EcoString::from("Test command"),
+        usage: EcoString::from("test [OPTIONS]"),
+        options: eco_vec![Opt {
+            names: eco_vec![
+                OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
             ],
-            argument: String::new(),
-            description: "Enable verbose mode".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("Enable verbose mode"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let output = BashGenerator::generate(&cmd);
@@ -149,19 +150,19 @@ fn test_bash_generator_snapshot() {
 #[test]
 fn test_bash_generator_compat_snapshot() {
     let cmd = Command {
-        name: "test".to_string(),
-        description: "Test command".to_string(),
-        usage: "test [OPTIONS]".to_string(),
-        options: vec![Opt {
-            names: vec![
-                OptName::new("-v".to_string(), OptNameType::ShortType),
-                OptName::new("--verbose".to_string(), OptNameType::LongType),
+        name: EcoString::from("test"),
+        description: EcoString::from("Test command"),
+        usage: EcoString::from("test [OPTIONS]"),
+        options: eco_vec![Opt {
+            names: eco_vec![
+                OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
             ],
-            argument: String::new(),
-            description: "Enable verbose mode".to_string(),
+            argument: EcoString::new(),
+            description: EcoString::from("Enable verbose mode"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let output = BashGenerator::generate_with_compat(&cmd, true);
@@ -171,19 +172,19 @@ fn test_bash_generator_compat_snapshot() {
 #[test]
 fn test_fish_generator_snapshot() {
     let cmd = Command {
-        name: "test".to_string(),
-        description: "Test command".to_string(),
-        usage: "test [OPTIONS]".to_string(),
-        options: vec![Opt {
-            names: vec![
-                OptName::new("-v".to_string(), OptNameType::ShortType),
-                OptName::new("--verbose".to_string(), OptNameType::LongType),
+        name: EcoString::from("test"),
+        description: EcoString::from("Test command"),
+        usage: EcoString::from("test [OPTIONS]"),
+        options: eco_vec![Opt {
+            names: eco_vec![
+                OptName::new(EcoString::from("-v"), OptNameType::ShortType),
+                OptName::new(EcoString::from("--verbose"), OptNameType::LongType),
             ],
-            argument: "FILE".to_string(),
-            description: "Enable verbose mode using a file".to_string(),
+            argument: EcoString::from("FILE"),
+            description: EcoString::from("Enable verbose mode using a file"),
         }],
-        subcommands: vec![],
-        version: String::new(),
+        subcommands: eco_vec![],
+        version: EcoString::new(),
     };
 
     let output = FishGenerator::generate(&cmd);

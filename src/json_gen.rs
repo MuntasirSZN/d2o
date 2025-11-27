@@ -1,24 +1,25 @@
 use crate::types::Command;
+use ecow::EcoString;
 use serde_json::json;
 
 pub struct JsonGenerator;
 
 impl JsonGenerator {
-    pub fn generate(cmd: &Command) -> String {
+    pub fn generate(cmd: &Command) -> EcoString {
         let json = Self::command_to_json(cmd);
-        serde_json::to_string_pretty(&json).unwrap_or_default()
+        EcoString::from(serde_json::to_string_pretty(&json).unwrap_or_default())
     }
 
     fn command_to_json(cmd: &Command) -> serde_json::Value {
         let mut obj = json!({
-            "name": cmd.name,
-            "description": cmd.description,
-            "usage": cmd.usage,
+            "name": cmd.name.as_str(),
+            "description": cmd.description.as_str(),
+            "usage": cmd.usage.as_str(),
             "options": cmd.options.iter().map(|opt| {
                 json!({
-                    "names": opt.names.iter().map(|n| n.raw.clone()).collect::<Vec<_>>(),
-                    "argument": opt.argument,
-                    "description": opt.description,
+                    "names": opt.names.iter().map(|n| n.raw.as_str()).collect::<Vec<_>>(),
+                    "argument": opt.argument.as_str(),
+                    "description": opt.description.as_str(),
                 })
             }).collect::<Vec<_>>(),
         });
@@ -29,8 +30,8 @@ impl JsonGenerator {
                     .iter()
                     .map(|sub| {
                         json!({
-                            "name": sub.name,
-                            "description": sub.description,
+                            "name": sub.name.as_str(),
+                            "description": sub.description.as_str(),
                         })
                     })
                     .collect::<Vec<_>>()
@@ -38,7 +39,7 @@ impl JsonGenerator {
         }
 
         if !cmd.version.is_empty() {
-            obj["version"] = json!(cmd.version);
+            obj["version"] = json!(cmd.version.as_str());
         }
 
         obj
@@ -48,23 +49,28 @@ impl JsonGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ecow::{EcoString, EcoVec};
 
     #[test]
     fn test_json_generator_includes_fields() {
         let cmd = Command {
-            name: "test".to_string(),
-            description: "Test command".to_string(),
-            usage: "test [OPTIONS]".to_string(),
-            options: vec![],
-            subcommands: vec![Command {
-                name: "sub".to_string(),
-                description: "Subcommand".to_string(),
-                usage: String::new(),
-                options: vec![],
-                subcommands: vec![],
-                version: String::new(),
-            }],
-            version: "1.0.0".to_string(),
+            name: EcoString::from("test"),
+            description: EcoString::from("Test command"),
+            usage: EcoString::from("test [OPTIONS]"),
+            options: EcoVec::new(),
+            subcommands: {
+                let mut v = EcoVec::new();
+                v.push(Command {
+                    name: EcoString::from("sub"),
+                    description: EcoString::from("Subcommand"),
+                    usage: EcoString::new(),
+                    options: EcoVec::new(),
+                    subcommands: EcoVec::new(),
+                    version: EcoString::new(),
+                });
+                v
+            },
+            version: EcoString::from("1.0.0"),
         };
 
         let json_str = JsonGenerator::generate(&cmd);
@@ -80,25 +86,31 @@ mod tests {
     #[test]
     fn test_json_generator_includes_options() {
         let cmd = Command {
-            name: "test".to_string(),
-            description: "Test command".to_string(),
-            usage: "test [OPTIONS]".to_string(),
-            options: vec![crate::types::Opt {
-                names: vec![
-                    crate::types::OptName::new(
-                        "-v".to_string(),
-                        crate::types::OptNameType::ShortType,
-                    ),
-                    crate::types::OptName::new(
-                        "--verbose".to_string(),
-                        crate::types::OptNameType::LongType,
-                    ),
-                ],
-                argument: "FILE".to_string(),
-                description: "Enable verbose mode".to_string(),
-            }],
-            subcommands: vec![],
-            version: String::new(),
+            name: EcoString::from("test"),
+            description: EcoString::from("Test command"),
+            usage: EcoString::from("test [OPTIONS]"),
+            options: {
+                let mut v = EcoVec::new();
+                v.push(crate::types::Opt {
+                    names: {
+                        let mut names = EcoVec::new();
+                        names.push(crate::types::OptName::new(
+                            EcoString::from("-v"),
+                            crate::types::OptNameType::ShortType,
+                        ));
+                        names.push(crate::types::OptName::new(
+                            EcoString::from("--verbose"),
+                            crate::types::OptNameType::LongType,
+                        ));
+                        names
+                    },
+                    argument: EcoString::from("FILE"),
+                    description: EcoString::from("Enable verbose mode"),
+                });
+                v
+            },
+            subcommands: EcoVec::new(),
+            version: EcoString::new(),
         };
 
         let json_str = JsonGenerator::generate(&cmd);

@@ -1,32 +1,53 @@
 use crate::types::{Command, Opt, OptName, OptNameType};
+use aho_corasick::AhoCorasick;
+use ecow::EcoString;
+use memchr::memchr;
 use std::collections::BTreeSet;
+use std::fmt::Write;
+use std::sync::LazyLock;
+
+// Pre-compiled Aho-Corasick automaton for file/dir/path matching (SIMD-accelerated)
+static FILE_PATH_MATCHER: LazyLock<AhoCorasick> = LazyLock::new(|| {
+    AhoCorasick::builder()
+        .ascii_case_insensitive(true)
+        .build(["file", "dir", "path", "archive"])
+        .unwrap()
+});
 
 pub struct FishGenerator;
 
 impl FishGenerator {
-    pub fn generate(cmd: &Command) -> String {
-        let mut lines = Vec::new();
-        Self::generate_rec(&mut lines, &[], cmd);
-        lines.join("\n")
+    pub fn generate(cmd: &Command) -> EcoString {
+        // Pre-calculate capacity based on options count
+        let estimated_size = 64 + cmd.options.len() * 80;
+        let mut buf = String::with_capacity(estimated_size);
+        Self::generate_rec(&mut buf, &[], cmd);
+        // Remove trailing newline if present
+        if buf.ends_with('\n') {
+            buf.pop();
+        }
+        EcoString::from(buf)
     }
 
-    fn generate_rec(lines: &mut Vec<String>, path: &[&str], cmd: &Command) {
+    fn generate_rec(buf: &mut String, path: &[&str], cmd: &Command) {
         let mut current_path = path.to_vec();
         current_path.push(&cmd.name);
+        let path_str = current_path.join("_");
 
-        for opt in &cmd.options {
-            for name in &opt.names {
+        for opt in cmd.options.iter() {
+            for name in opt.names.iter() {
                 if !Self::should_skip_option(name) {
-                    lines.push(Self::make_option_line(&current_path, name, opt));
+                    Self::write_option_line(buf, &path_str, name, opt);
                 }
             }
         }
 
-        for subcmd in &cmd.subcommands {
-            Self::generate_rec(lines, &current_path, subcmd);
+        for subcmd in cmd.subcommands.iter() {
+            Self::generate_rec(buf, &current_path, subcmd);
         }
     }
 
+    #[inline]
     fn should_skip_option(name: &OptName) -> bool {
         matches!(
             name.opt_type,
@@ -34,87 +55,92 @@ impl FishGenerator {
         )
     }
 
-    fn make_option_line(path: &[&str], name: &OptName, opt: &Opt) -> String {
+    fn write_option_line(buf: &mut String, path_str: &str, name: &OptName, opt: &Opt) {
         let dashless = name.raw.trim_start_matches('-');
-        let quoted = format!("'{}'", dashless);
         let flag = Self::opt_type_to_flag(name.opt_type);
         let arg_flag = Self::opt_arg_to_flag(opt);
         let desc = Self::truncate_after_period(&opt.description);
 
-        format!(
-            "complete -c {} {} {} {} -d '{}'",
-            path.join("_"),
+        let _ = writeln!(
+            buf,
+            "complete -c {} {} '{}' {} -d '{}'",
+            path_str,
             flag,
-            quoted,
+            dashless,
             arg_flag,
             desc.replace('\'', "\\'")
-        )
+        );
     }
 
-    fn opt_type_to_flag(opt_type: OptNameType) -> String {
+    #[inline]
+    fn opt_type_to_flag(opt_type: OptNameType) -> &'static str {
         match opt_type {
-            OptNameType::LongType => "-l".to_string(),
-            OptNameType::ShortType => "-s".to_string(),
-            OptNameType::OldType => "-o".to_string(),
-            _ => String::new(),
+            OptNameType::LongType => "-l",
+            OptNameType::ShortType => "-s",
+            OptNameType::OldType => "-o",
+            _ => "",
         }
     }
 
+    /// Use Aho-Corasick automaton for SIMD-accelerated multi-pattern matching
+    #[inline]
     fn opt_arg_to_flag(opt: &Opt) -> &'static str {
-        let arg_lower = opt.argument.to_lowercase();
-        let desc_lower = opt.description.to_lowercase();
-
         if opt.argument.is_empty() {
-            ""
-        } else if arg_lower.contains("file")
-            || arg_lower.contains("dir")
-            || arg_lower.contains("path")
-            || arg_lower.contains("archive")
-            || desc_lower.contains("file")
-            || desc_lower.contains("dir")
-            || desc_lower.contains("path")
-        {
-            "-r"
-        } else {
-            "-x"
+            return "";
         }
+
+        // Use pre-compiled Aho-Corasick for SIMD multi-pattern search
+        if FILE_PATH_MATCHER.is_match(opt.argument.as_str()) {
+            return "-r";
+        }
+
+        if FILE_PATH_MATCHER.is_match(opt.description.as_str()) {
+            return "-r";
+        }
+
+        "-x"
     }
 
-    fn truncate_after_period(line: &str) -> String {
-        line.split('.').next().unwrap_or("").to_string()
+    /// Truncate string after first period using SIMD-accelerated memchr
+    #[inline]
+    pub fn truncate_after_period(line: &str) -> &str {
+        // Use memchr for SIMD-accelerated '.' search
+        match memchr(b'.', line.as_bytes()) {
+            Some(pos) => &line[..pos],
+            None => line,
+        }
     }
 }
 
 pub struct ZshGenerator;
 
 impl ZshGenerator {
-    pub fn generate(cmd: &Command) -> String {
-        let mut lines = vec![
-            format!("#compdef {}", cmd.name),
-            "".to_string(),
-            format!("_{}() {{", cmd.name),
-            "  local -a options".to_string(),
-            "".to_string(),
-        ];
+    pub fn generate(cmd: &Command) -> EcoString {
+        let estimated_size = 256 + cmd.options.len() * 64;
+        let mut buf = String::with_capacity(estimated_size);
 
-        for opt in &cmd.options {
-            let opt_lines = Self::generate_opt(opt);
-            lines.extend(opt_lines);
+        let _ = writeln!(buf, "#compdef {}", cmd.name);
+        let _ = writeln!(buf);
+        let _ = writeln!(buf, "_{}() {{", cmd.name);
+        let _ = writeln!(buf, "  local -a options");
+        let _ = writeln!(buf);
+
+        for opt in cmd.options.iter() {
+            Self::write_opt(&mut buf, opt);
         }
 
-        lines.push("  _arguments -s -S $options".to_string());
-        lines.push("}".to_string());
-        lines.push("".to_string());
-        lines.push(format!("_{} \"$@\"", cmd.name));
+        let _ = writeln!(buf, "  _arguments -s -S $options");
+        let _ = writeln!(buf, "}}");
+        let _ = writeln!(buf);
+        let _ = write!(buf, "_{} \"$@\"", cmd.name);
 
-        lines.join("\n")
+        EcoString::from(buf)
     }
 
-    fn generate_opt(opt: &Opt) -> Vec<String> {
-        let mut lines = Vec::new();
-        let desc = Self::truncate_after_period(&opt.description);
+    fn write_opt(buf: &mut String, opt: &Opt) {
+        let desc = FishGenerator::truncate_after_period(&opt.description);
 
-        for name in &opt.names {
+        for name in opt.names.iter() {
             if matches!(
                 name.opt_type,
                 OptNameType::SingleDashAlone | OptNameType::DoubleDashAlone
@@ -122,47 +148,45 @@ impl ZshGenerator {
                 continue;
             }
 
-            let spec = if opt.argument.is_empty() {
-                format!("'{}[{}]'", name.raw, desc)
+            if opt.argument.is_empty() {
+                let _ = writeln!(buf, "  options+=('{}[{}]')", name.raw, desc);
             } else {
-                format!("'{}[{} {}]'", name.raw, opt.argument, desc)
-            };
-
-            lines.push(format!("  options+=({})", spec));
+                let _ = writeln!(
+                    buf,
+                    "  options+=('{}[{} {}]')",
+                    name.raw, opt.argument, desc
+                );
+            }
         }
-
-        lines
-    }
-
-    fn truncate_after_period(line: &str) -> String {
-        line.split('.').next().unwrap_or("").to_string()
     }
 }
 
 pub struct BashGenerator;
 
 impl BashGenerator {
-    pub fn generate(cmd: &Command) -> String {
+    pub fn generate(cmd: &Command) -> EcoString {
         Self::generate_with_compat(cmd, false)
     }
 
-    pub fn generate_with_compat(cmd: &Command, bash_completion_compat: bool) -> String {
-        let mut lines = vec![
-            format!("_{}()", cmd.name),
-            "{".to_string(),
-            "  local cur prev opts".to_string(),
-            "  COMPREPLY=()".to_string(),
-            "  cur=\"${COMP_WORDS[COMP_CWORD]}\"".to_string(),
-            "  prev=\"${COMP_WORDS[COMP_CWORD-1]}\"".to_string(),
-            "".to_string(),
-        ];
+    pub fn generate_with_compat(cmd: &Command, bash_completion_compat: bool) -> EcoString {
+        let estimated_size = 512 + cmd.options.len() * 32;
+        let mut buf = String::with_capacity(estimated_size);
 
-        let all_opts: Vec<String> = if bash_completion_compat {
+        let _ = writeln!(buf, "_{}()", cmd.name);
+        let _ = writeln!(buf, "{{");
+        let _ = writeln!(buf, "  local cur prev opts");
+        let _ = writeln!(buf, "  COMPREPLY=()");
+        let _ = writeln!(buf, "  cur=\"${{COMP_WORDS[COMP_CWORD]}}\"");
+        let _ = writeln!(buf, "  prev=\"${{COMP_WORDS[COMP_CWORD-1]}}\"");
+        let _ = writeln!(buf);
+
+        // Collect all option strings into a BTreeSet for deduplication and sorting
+        let all_opts: BTreeSet<String> = if bash_completion_compat {
             cmd.options
                 .iter()
                 .flat_map(|opt| {
                     let base_desc = FishGenerator::truncate_after_period(&opt.description);
-                    let desc = base_desc
+                    let desc: String = base_desc
                         .split_whitespace()
                         .collect::<Vec<_>>()
                         .join("_")
@@ -177,15 +201,17 @@ impl BashGenerator {
                             ) {
                                 None
                             } else if desc.is_empty() {
-                                Some(name.raw.clone())
+                                Some(name.raw.to_string())
                             } else {
-                                Some(format!("{}:{}", name.raw, desc))
+                                let mut s = String::with_capacity(name.raw.len() + desc.len() + 1);
+                                s.push_str(&name.raw);
+                                s.push(':');
+                                s.push_str(&desc);
+                                Some(s)
                             }
                         })
                         .collect::<Vec<_>>()
                 })
-                .collect::<BTreeSet<_>>()
-                .into_iter()
                 .collect()
         } else {
             cmd.options
@@ -200,105 +226,109 @@ impl BashGenerator {
                             ) {
                                 None
                             } else {
-                                Some(name.raw.clone())
+                                Some(name.raw.to_string())
                             }
                         })
                         .collect::<Vec<_>>()
                 })
-                .collect::<BTreeSet<_>>()
-                .into_iter()
                 .collect()
         };
 
-        lines.push(format!("  opts=\"{}\"", all_opts.join(" ")));
-        lines.push("".to_string());
-        lines.push("  COMPREPLY=($(compgen -W \"${opts}\" -- ${cur}))".to_string());
+        // Build opts string efficiently
+        let opts_joined = all_opts.into_iter().collect::<Vec<_>>().join(" ");
+        let _ = writeln!(buf, "  opts=\"{}\"", opts_joined);
+        let _ = writeln!(buf);
+        let _ = writeln!(buf, "  COMPREPLY=($(compgen -W \"${{opts}}\" -- ${{cur}}))");
 
         if bash_completion_compat {
-            lines.push("  if type __ltrim_colon_completions &>/dev/null; then".to_string());
-            lines.push("    __ltrim_colon_completions \"$cur\"".to_string());
-            lines.push("  fi".to_string());
+            let _ = writeln!(buf, "  if type __ltrim_colon_completions &>/dev/null; then");
+            let _ = writeln!(buf, "    __ltrim_colon_completions \"$cur\"");
+            let _ = writeln!(buf, "  fi");
         }
 
-        lines.push("}".to_string());
-        lines.push("".to_string());
-        lines.push(format!(
+        let _ = writeln!(buf, "}}");
+        let _ = writeln!(buf);
+        let _ = write!(
+            buf,
             "complete -o bashdefault -o default -o nospace -F _{} {}",
             cmd.name, cmd.name
-        ));
+        );
 
-        lines.join("\n")
+        EcoString::from(buf)
     }
 }
 
 pub struct ElvishGenerator;
 
 impl ElvishGenerator {
-    pub fn generate(cmd: &Command) -> String {
-        let mut lines = Vec::new();
-        lines.push("use builtin;".to_string());
-        lines.push("use str;".to_string());
-        lines.push("".to_string());
-        lines.push(format!(
+    pub fn generate(cmd: &Command) -> EcoString {
+        let estimated_size = 512 + cmd.options.len() * 48;
+        let mut buf = String::with_capacity(estimated_size);
+
+        let _ = writeln!(buf, "use builtin;");
+        let _ = writeln!(buf, "use str;");
+        let _ = writeln!(buf);
+        let _ = writeln!(
+            buf,
             "set edit:completion:arg-completer[{}] = {{|@words|",
             cmd.name
-        ));
-        lines.push("    fn spaces {|n|".to_string());
-        lines.push("        builtin:repeat $n ' ' | str:join ''".to_string());
-        lines.push("    }".to_string());
-        lines.push("    fn cand {|text desc|".to_string());
-        lines.push(
-            "        edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc"
-                .to_string(),
         );
-        lines.push("    }".to_string());
-        lines.push(format!("    var command = '{}'", cmd.name));
-        lines.push("    for word $words[1..-1] {".to_string());
-        lines.push("        if (str:has-prefix $word '-') {".to_string());
-        lines.push("            break".to_string());
-        lines.push("        }".to_string());
-        lines.push("        set command = $command';'$word".to_string());
-        lines.push("    }".to_string());
-        lines.push("    var completions = [".to_string());
-        lines.push(format!("        &'{}'= {{", cmd.name));
+        let _ = writeln!(buf, "    fn spaces {{|n|");
+        let _ = writeln!(buf, "        builtin:repeat $n ' ' | str:join ''");
+        let _ = writeln!(buf, "    }}");
+        let _ = writeln!(buf, "    fn cand {{|text desc|");
+        let _ = writeln!(
+            buf,
+            "        edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc"
+        );
+        let _ = writeln!(buf, "    }}");
+        let _ = writeln!(buf, "    var command = '{}'", cmd.name);
+        let _ = writeln!(buf, "    for word $words[1..-1] {{");
+        let _ = writeln!(buf, "        if (str:has-prefix $word '-') {{");
+        let _ = writeln!(buf, "            break");
+        let _ = writeln!(buf, "        }}");
+        let _ = writeln!(buf, "        set command = $command';'$word");
+        let _ = writeln!(buf, "    }}");
+        let _ = writeln!(buf, "    var completions = [");
+        let _ = writeln!(buf, "        &'{}'= {{", cmd.name);
 
-        for opt in &cmd.options {
+        for opt in cmd.options.iter() {
             let desc = FishGenerator::truncate_after_period(&opt.description);
-            for name in &opt.names {
+            let desc_clean = desc.replace('\'', "");
+            for name in opt.names.iter() {
                 if matches!(
                     name.opt_type,
                     OptNameType::SingleDashAlone | OptNameType::DoubleDashAlone
                 ) {
                     continue;
                 }
-                lines.push(format!(
-                    "            cand {} '{}'",
-                    name.raw,
-                    desc.replace("'", ""),
-                ));
+                let _ = writeln!(buf, "            cand {} '{}'", name.raw, desc_clean);
             }
         }
 
-        lines.push("        }".to_string());
-        lines.push("    ]".to_string());
-        lines.push("    $completions[$command]".to_string());
-        lines.push("}".to_string());
+        let _ = writeln!(buf, "        }}");
+        let _ = writeln!(buf, "    ]");
+        let _ = writeln!(buf, "    $completions[$command]");
+        let _ = write!(buf, "}}");
 
-        lines.join("\n")
+        EcoString::from(buf)
     }
 }
 
 pub struct NushellGenerator;
 
 impl NushellGenerator {
-    pub fn generate(cmd: &Command) -> String {
-        let mut lines = Vec::new();
-        lines.push("module completions {".to_string());
-        lines.push("".to_string());
+    pub fn generate(cmd: &Command) -> EcoString {
+        let estimated_size = 512 + cmd.options.len() * 48;
+        let mut buf = String::with_capacity(estimated_size);
 
-        lines.push(format!("  # Completions for {} options", cmd.name));
-        lines.push(format!("  def \"nu-complete {} options\" [] {{", cmd.name));
-        let all_opts: Vec<String> = cmd
+        let _ = writeln!(buf, "module completions {{");
+        let _ = writeln!(buf);
+        let _ = writeln!(buf, "  # Completions for {} options", cmd.name);
+        let _ = writeln!(buf, "  def \"nu-complete {} options\" [] {{", cmd.name);
+
+        // Collect options into BTreeSet for deduplication and sorting
+        let all_opts: BTreeSet<&str> = cmd
             .options
             .iter()
             .flat_map(|opt| {
@@ -309,37 +339,36 @@ impl NushellGenerator {
                             name.opt_type,
                             OptNameType::SingleDashAlone | OptNameType::DoubleDashAlone
                         ) {
-                            Some(format!("\"{}\"", name.raw))
+                            Some(name.raw.as_str())
                         } else {
                             None
                         }
                     })
                     .collect::<Vec<_>>()
             })
-            .collect::<BTreeSet<_>>()
-            .into_iter()
             .collect();
 
         if all_opts.is_empty() {
-            lines.push("    []".to_string());
+            let _ = writeln!(buf, "    []");
         } else {
-            let joined = all_opts.join(" ");
-            lines.push(format!("    [ {} ]", joined));
+            let _ = write!(buf, "    [ ");
+            for (i, opt) in all_opts.iter().enumerate() {
+                if i > 0 {
+                    let _ = write!(buf, " ");
+                }
+                let _ = write!(buf, "\"{}\"", opt);
+            }
+            let _ = writeln!(buf, " ]");
         }
-        lines.push("  }".to_string());
-        lines.push("".to_string());
+        let _ = writeln!(buf, "  }}");
+        let _ = writeln!(buf);
 
-        lines.push(format!("  export extern {} [", cmd.name));
+        let _ = writeln!(buf, "  export extern {} [", cmd.name);
 
-        for opt in &cmd.options {
+        for opt in cmd.options.iter() {
             let desc = FishGenerator::truncate_after_period(&opt.description);
-            let arg = if opt.argument.is_empty() {
-                String::new()
-            } else {
-                format!(": string  # {}", opt.argument)
-            };
 
-            for name in &opt.names {
+            for name in opt.names.iter() {
                 if matches!(
                     name.opt_type,
                     OptNameType::SingleDashAlone | OptNameType::DoubleDashAlone
@@ -347,19 +376,25 @@ impl NushellGenerator {
                     continue;
                 }
 
-                let flag = format!("    {}{} # {}", name.raw, arg, desc);
-
-                lines.push(flag);
+                if opt.argument.is_empty() {
+                    let _ = writeln!(buf, "    {} # {}", name.raw, desc);
+                } else {
+                    let _ = writeln!(
+                        buf,
+                        "    {}: string  # {} # {}",
+                        name.raw, opt.argument, desc
+                    );
+                }
             }
         }
 
-        lines.push("  ]".to_string());
-        lines.push("".to_string());
-        lines.push("}".to_string());
-        lines.push("".to_string());
-        lines.push("export use completions *".to_string());
+        let _ = writeln!(buf, "  ]");
+        let _ = writeln!(buf);
+        let _ = writeln!(buf, "}}");
+        let _ = writeln!(buf);
+        let _ = write!(buf, "export use completions *");
 
-        lines.join("\n")
+        EcoString::from(buf)
     }
 }
 
