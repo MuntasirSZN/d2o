@@ -61,6 +61,7 @@ fn cli_write_caches_to_home_hcl() {
     let mut cmd = cargo_bin_cmd!("hcl");
     let assert = cmd
         .env("HOME", home_dir.path())
+        .env("USERPROFILE", home_dir.path())
         .args(["--file", &help_path, "--format", "bash", "--write"])
         .assert()
         .success();
