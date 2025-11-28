@@ -1,11 +1,11 @@
 [package]
-name = "hcl"
+name = "d2o"
 version = "0.1.0"
 edition = "2024"
 description = "Help to Options - Parse help or manpage texts and generate shell completion scripts"
-documentation = "https://github.com/MuntasirSZN/hcl"
+documentation = "https://github.com/MuntasirSZN/d2o"
 readme = "README.md"
-repository = "https://github.com/MuntasirSZN/hcl"
+repository = "https://github.com/MuntasirSZN/d2o"
 license = "MIT"
 keywords = ["cli", "completion", "help", "manpage", "shell"]
 categories = ["command-line-utilities", "parsing"]

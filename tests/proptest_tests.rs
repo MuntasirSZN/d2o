@@ -1,10 +1,10 @@
-//! Property-based tests using proptest for the hcl crate.
+//! Property-based tests using proptest for the d2o crate.
 //!
 //! These tests verify invariants that should hold for any valid input,
 //! helping catch edge cases that unit tests might miss.
 
 use ecow::{EcoString, EcoVec, eco_vec};
-use hcl::{
+use d2o::{
     BashGenerator, Command, ElvishGenerator, FishGenerator, JsonGenerator, Layout,
     NushellGenerator, Opt, OptName, OptNameType, Postprocessor, ZshGenerator,
 };

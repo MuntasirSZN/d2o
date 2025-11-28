@@ -26,7 +26,7 @@ pub enum Shell {
     version,
     author,
     about = "Parse help or manpage texts and generate shell completion scripts",
-    long_about = "hcl extracts CLI options from help text and exports them as shell completion scripts or JSON."
+    long_about = "d2o extracts CLI options from help text and exports them as shell completion scripts or JSON."
 )]
 pub struct Cli {
     /// Extract CLI options from the help texts or man pages associated with the command
@@ -64,7 +64,7 @@ pub struct Cli {
         long,
         short = 'l',
         help = "Load a Command JSON file",
-        long_help = "Load a JSON file that uses hcl's Command schema and operate on that instead of parsing help text.",
+        long_help = "Load a JSON file that uses d2o's Command schema and operate on that instead of parsing help text.",
         conflicts_with_all = ["command", "file", "subcommand"],
     )]
     pub loadjson: Option<String>,

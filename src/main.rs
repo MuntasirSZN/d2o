@@ -3,7 +3,7 @@ use clap_complete::generate;
 use clap_complete::shells::{Bash, Elvish, Fish, PowerShell, Zsh};
 use clap_complete_nushell::Nushell;
 use ecow::EcoString;
-use hcl::{
+use d2o::{
     BashGenerator, Cache, Cli, Command, ElvishGenerator, FishGenerator, IoHandler, JsonGenerator,
     Layout, NushellGenerator, Postprocessor, Shell, SubcommandParser, ZshGenerator,
     command_with_version,
@@ -298,7 +298,7 @@ async fn write_output_to_cache(
         .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
 
     let mut dir = home;
-    dir.push(".hcl");
+    dir.push(".d2o");
     tokio::fs::create_dir_all(&dir).await?;
 
     let file_name = format!("{}.{}", cmd.name, format);
@@ -314,7 +314,7 @@ async fn write_output_to_cache(
 mod tests {
     use super::*;
     use ecow::EcoVec;
-    use hcl::cli::DEFAULT_CACHE_TTL_HOURS;
+    use d2o::cli::DEFAULT_CACHE_TTL_HOURS;
 
     /// Helper to create a default Cli for testing
     fn test_cli() -> Cli {
@@ -379,12 +379,12 @@ mod tests {
             usage: EcoString::from("jsoncmd [OPTIONS]"),
             options: {
                 let mut v = EcoVec::new();
-                v.push(hcl::types::Opt {
+                v.push(d2o::types::Opt {
                     names: {
                         let mut names = EcoVec::new();
-                        names.push(hcl::types::OptName::new(
+                        names.push(d2o::types::OptName::new(
                             EcoString::from("-v"),
-                            hcl::types::OptNameType::ShortType,
+                            d2o::types::OptNameType::ShortType,
                         ));
                         names
                     },
@@ -458,16 +458,16 @@ mod tests {
         cmd.description = EcoString::from("Test command");
         cmd.usage = EcoString::from("test [OPTIONS]");
 
-        cmd.options.push(hcl::types::Opt {
+        cmd.options.push(d2o::types::Opt {
             names: {
                 let mut v = EcoVec::new();
-                v.push(hcl::types::OptName::new(
+                v.push(d2o::types::OptName::new(
                     EcoString::from("-v"),
-                    hcl::types::OptNameType::ShortType,
+                    d2o::types::OptNameType::ShortType,
                 ));
-                v.push(hcl::types::OptName::new(
+                v.push(d2o::types::OptName::new(
                     EcoString::from("--verbose"),
-                    hcl::types::OptNameType::LongType,
+                    d2o::types::OptNameType::LongType,
                 ));
                 v
             },

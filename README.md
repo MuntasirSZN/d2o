@@ -1,4 +1,4 @@
-# `hcl`
+# `d2o`
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
@@ -11,37 +11,37 @@ A high-performance, pure Rust rewrite of h2o - a CLI tool that extracts command-
 ### From Source
 
 ```bash
-cd /home/muntasir/projects/hcl
+cd /home/muntasir/projects/d2o
 cargo build --release
-./target/release/hcl --help
+./target/release/d2o --help
 ```
 
-The release binary will be at `target/release/hcl`
+The release binary will be at `target/release/d2o`
 
 ### Pre-compiled Binary
 
 Copy the binary to your PATH:
 
 ```bash
-cp target/release/hcl ~/.local/bin/
+cp target/release/d2o ~/.local/bin/
 ```
 
 ### Using Cargo
 
 ```bash
-cargo install hcl
+cargo install d2o
 ```
 
 ### Using `cargo-binstall`
 
 ```bash
-cargo binstall hcl
+cargo binstall d2o
 ```
 
 Completions are also available for `bash`, `zsh`, `fish`, `powershell`, `elvish` and `nushell`:
 
 ```bash
-hcl --completions <shell> # Replace <shell> with your shell name
+d2o --completions <shell> # Replace <shell> with your shell name
 ```
 
 Manpages are in tarballs and zips in releases.
@@ -52,26 +52,26 @@ Manpages are in tarballs and zips in releases.
 
 ```shell
 # Generate fish completion script from `man ls` or `ls --help`
-hcl --command ls --format fish > ls.fish
+d2o --command ls --format fish > ls.fish
 
 # Generate zsh completion script
-hcl --command git --format zsh > git.zsh
+d2o --command git --format zsh > git.zsh
 
 # Generate bash completion script (plain options only)
-hcl --command docker --format bash > docker.bash
+d2o --command docker --format bash > docker.bash
 
 # Generate bash completion script compatible with bash-completion (includes descriptions)
-hcl --command docker --format bash --bash-completion-compat > docker.bash
+d2o --command docker --format bash --bash-completion-compat > docker.bash
 ```
 
 ### Export as JSON
 
 ```shell
 # Export CLI info as JSON
-hcl --command ls --format json
+d2o --command ls --format json
 
 # Pretty-print JSON output
-hcl --command curl --format json | jq .
+d2o --command curl --format json | jq .
 ```
 
 ### Parse local file
@@ -81,26 +81,26 @@ hcl --command curl --format json | jq .
 man grep | col -bx > grep.txt
 
 # Parse from file
-hcl --file grep.txt --format fish > grep.fish
+d2o --file grep.txt --format fish > grep.fish
 ```
 
 ### Advanced options
 
 ```shell
 # Skip man page lookup (use --help only)
-hcl --command cargo --skip-man --format json
+d2o --command cargo --skip-man --format json
 
 # List subcommands
-hcl --command git --list-subcommands
+d2o --command git --list-subcommands
 
 # Extract subcommand options
-hcl --subcommand git-log --format fish
+d2o --subcommand git-log --format fish
 
 # Preprocess only (debug option splitting)
-hcl --command ls --preprocess-only
+d2o --command ls --preprocess-only
 
 # Scan deeper for nested subcommands
-hcl --command docker --depth 2 --format json
+d2o --command docker --depth 2 --format json
 ```
 
 ### Building
@@ -116,7 +116,7 @@ cargo build --release
 ### Running with verbose output
 
 ```bash
-RUST_LOG=debug ./target/release/hcl --command ls --format json
+RUST_LOG=debug ./target/release/d2o --command ls --format json
 ```
 
 ## Known Limitations

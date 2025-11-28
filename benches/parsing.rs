@@ -5,7 +5,7 @@
 use divan::AllocProfiler;
 use divan::{Bencher, black_box};
 use ecow::{EcoString, EcoVec, eco_vec};
-use hcl::{
+use d2o::{
     BashGenerator, Command, ElvishGenerator, FishGenerator, JsonGenerator, Layout,
     NushellGenerator, Opt, OptName, OptNameType, Postprocessor, ZshGenerator,
 };

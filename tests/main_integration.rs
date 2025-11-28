@@ -5,7 +5,7 @@ use predicates::prelude::*;
 /// Ensure running with no args shows clap error about missing input
 #[test]
 fn cli_errors_without_input_source() {
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.assert().failure().stderr(predicate::str::contains(
         "No input source specified. Use --command, --file, --subcommand, or --loadjson",
     ));
@@ -14,12 +14,12 @@ fn cli_errors_without_input_source() {
 /// Smoke-test --help output
 #[test]
 fn cli_help_works() {
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.arg("--help")
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "hcl extracts CLI options from help text",
+            "d2o extracts CLI options from help text",
         ));
 }
 
@@ -36,16 +36,16 @@ fn cli_file_native_output() {
     .unwrap();
     let path = tmp.path().to_str().unwrap().to_string();
 
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.args(["--file", &path, "--format", "native"])
         .assert()
         .success()
         .stdout(predicate::str::contains("USAGE: mycmd [OPTIONS]"));
 }
 
-/// Verify --write caches output under ~/.hcl
+/// Verify --write caches output under ~/.d2o
 #[test]
-fn cli_write_caches_to_home_hcl() {
+fn cli_write_caches_to_home_d2o() {
     use std::io::Write;
 
     let mut help_tmp = tempfile::NamedTempFile::new().expect("create temp help");
@@ -58,7 +58,7 @@ fn cli_write_caches_to_home_hcl() {
 
     let home_dir = tempfile::TempDir::new().expect("create temp home");
 
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     let assert = cmd
         .env("HOME", home_dir.path())
         .env("USERPROFILE", home_dir.path())
@@ -69,12 +69,12 @@ fn cli_write_caches_to_home_hcl() {
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     let stdout_trimmed = stdout.trim();
 
-    // Path printed should exist and be under $HOME/.hcl
+    // Path printed should exist and be under $HOME/.d2o
     let path = std::path::Path::new(stdout_trimmed);
     assert!(path.exists());
     assert!(
-        path.starts_with(home_dir.path().join(".hcl")),
-        "expected path under ~/.hcl, got {:?}",
+        path.starts_with(home_dir.path().join(".d2o")),
+        "expected path under ~/.d2o, got {:?}",
         path
     );
 }
@@ -92,7 +92,7 @@ fn cli_file_json_output() {
     .unwrap();
     let path = tmp.path().to_str().unwrap().to_string();
 
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     let assert = cmd
         .args(["--file", &path, "--format", "json"])
         .assert()
@@ -112,11 +112,11 @@ fn cli_file_json_output() {
 /// Ensure completions flag at least runs for bash
 #[test]
 fn cli_completions_bash() {
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.args(["--completions", "bash"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("_hcl"));
+        .stdout(predicate::str::contains("_d2o"));
 }
 
 /// Test --list-subcommands path using a help snippet via --file
@@ -132,7 +132,7 @@ fn cli_list_subcommands_from_file() {
     .unwrap();
     let path = tmp.path().to_str().unwrap().to_string();
 
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.args(["--file", &path, "--list-subcommands"])
         .assert()
         .success()
@@ -148,7 +148,7 @@ fn cli_debug_preprocess_only() {
     writeln!(tmp, "OPTIONS:\n  -v, --verbose  be verbose",).unwrap();
     let path = tmp.path().to_str().unwrap().to_string();
 
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.args(["--file", &path, "--debug"])
         .assert()
         .success()
@@ -158,7 +158,7 @@ fn cli_debug_preprocess_only() {
 /// Smoke-test --command echo with skip_man so it uses --help
 #[test]
 fn cli_command_echo_native() {
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.args(["--command", "echo", "--skip-man", "--format", "native"])
         .assert()
         .success();
@@ -169,14 +169,14 @@ fn cli_command_echo_native() {
 fn cli_loadjson_native_output() {
     use std::io::Write;
 
-    let cmd_struct = hcl::Command {
+    let cmd_struct = d2o::Command {
         name: EcoString::from("jsoncmd"),
         description: EcoString::from("Json command"),
         usage: EcoString::from("jsoncmd [OPTIONS]"),
-        options: eco_vec![hcl::types::Opt {
-            names: eco_vec![hcl::types::OptName::new(
+        options: eco_vec![d2o::types::Opt {
+            names: eco_vec![d2o::types::OptName::new(
                 EcoString::from("-v"),
-                hcl::types::OptNameType::ShortType,
+                d2o::types::OptNameType::ShortType,
             )],
             argument: EcoString::new(),
             description: EcoString::from("Verbose"),
@@ -190,7 +190,7 @@ fn cli_loadjson_native_output() {
     write!(tmp, "{}", json).unwrap();
     let path = tmp.path().to_str().unwrap().to_string();
 
-    let mut cmd = cargo_bin_cmd!("hcl");
+    let mut cmd = cargo_bin_cmd!("d2o");
     cmd.args(["--loadjson", &path, "--format", "native"])
         .assert()
         .success()

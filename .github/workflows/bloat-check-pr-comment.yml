@@ -34,7 +34,7 @@ jobs:
         with:
           script: |-
             const fs = require('node:fs');
-            const marker = '<!-- hcl-bloat-check -->';
+            const marker = '<!-- d2o-bloat-check -->';
             const comparison = await fs.promises.readFile('/tmp/bloat-check/bloat-comparison.txt', 'utf8');
             const body = `${marker}\n${comparison}`;
 

@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in hcl, please **do not** open a public GitHub issue.
+If you discover a security vulnerability in d2o, please **do not** open a public GitHub issue.
 
 Instead, please email security details to <muntasir.joypurhat@gmail.com>.
 
@@ -34,27 +34,27 @@ Please include:
 
 ## Security Best Practices
 
-When using hcl:
+When using d2o:
 
 1. **Keep Updated**: Regularly update to the latest version
 
    ```bash
-   cargo install --upgrade hcl
+   cargo install --upgrade d2o
    ```
 
 1. **Input Validation**: Be cautious with untrusted help text
 
-   - hcl processes help text locally
+   - d2o processes help text locally
    - No data is sent to external servers
 
 1. **Command Execution**: Review commands before installation
 
-   - hcl only reads command help text
+   - d2o only reads command help text
    - It doesn't execute commands without explicit user action
 
 ## Security Considerations
 
-### What hcl Does
+### What d2o Does
 
 - ✅ Reads local files
 - ✅ Executes `command --help` with user permissions
@@ -63,7 +63,7 @@ When using hcl:
 - ✅ Generates completion scripts
 - ✅ Exports JSON output
 
-### What hcl Does NOT Do
+### What d2o Does NOT Do
 
 - ❌ Make network requests
 - ❌ Write outside specified locations
@@ -74,20 +74,20 @@ When using hcl:
 
 ### Safe Usage
 
-hcl is designed to be used safely:
+d2o is designed to be used safely:
 
 ```bash
 # Safe - reads local man page
-hcl --command ls --format fish
+d2o --command ls --format fish
 
 # Safe - reads from file you control
-hcl --file my-help.txt --format json
+d2o --file my-help.txt --format json
 
 # Safe - reads from JSON you control
-hcl --json my-commands.json --format bash
+d2o --json my-commands.json --format bash
 
 # Caution - only use for commands you trust
-hcl --command suspicious-command --format json
+d2o --command suspicious-command --format json
 ```
 
 ## Dependencies

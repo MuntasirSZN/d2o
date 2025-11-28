@@ -60,28 +60,28 @@ jobs:
       - name: Create package (Unix)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p hcl-${{ matrix.build }}
-          cp target/${{ matrix.target }}/release/hcl hcl-${{ matrix.build }}/
-          cp -r completions man hcl-${{ matrix.build }}/ 2>/dev/null || true
-          cp README.md LICENSE hcl-${{ matrix.build }}/
-          tar -czf hcl-${{ matrix.build }}.tar.gz hcl-${{ matrix.build }}/
+          mkdir -p d2o-${{ matrix.build }}
+          cp target/${{ matrix.target }}/release/d2o d2o-${{ matrix.build }}/
+          cp -r completions man d2o-${{ matrix.build }}/ 2>/dev/null || true
+          cp README.md LICENSE d2o-${{ matrix.build }}/
+          tar -czf d2o-${{ matrix.build }}.tar.gz d2o-${{ matrix.build }}/
         shell: bash
       - name: Create package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "hcl-${{ matrix.build }}" -Force
-          Copy-Item "target/${{ matrix.target }}/release/hcl.exe" "hcl-${{ matrix.build }}/"
-          Copy-Item "completions", "man" "hcl-${{ matrix.build }}/" -Recurse -Force -ErrorAction SilentlyContinue
-          Copy-Item "README.md", "LICENSE" "hcl-${{ matrix.build }}/"
-          Compress-Archive -Path "hcl-${{ matrix.build }}" -DestinationPath "hcl-${{ matrix.build }}.zip" -Force
+          New-Item -ItemType Directory -Path "d2o-${{ matrix.build }}" -Force
+          Copy-Item "target/${{ matrix.target }}/release/d2o.exe" "d2o-${{ matrix.build }}/"
+          Copy-Item "completions", "man" "d2o-${{ matrix.build }}/" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item "README.md", "LICENSE" "d2o-${{ matrix.build }}/"
+          Compress-Archive -Path "d2o-${{ matrix.build }}" -DestinationPath "d2o-${{ matrix.build }}.zip" -Force
       - name: Upload artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: hcl-${{ matrix.build }}
+          name: d2o-${{ matrix.build }}
           path: |
-            hcl-${{ matrix.build }}.tar.gz
-            hcl-${{ matrix.build }}.zip
+            d2o-${{ matrix.build }}.tar.gz
+            d2o-${{ matrix.build }}.zip
   create-release:
     name: Create Release
     needs: build-matrix

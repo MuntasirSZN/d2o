@@ -21,18 +21,18 @@ fn main() {
     fs::create_dir_all(&completions_dir).unwrap();
 
     // Generate all standard shells
-    generate_to(Bash, &mut cmd, "hcl", &completions_dir)
+    generate_to(Bash, &mut cmd, "d2o", &completions_dir)
         .expect("Failed to generate bash completion");
-    generate_to(Fish, &mut cmd, "hcl", &completions_dir)
+    generate_to(Fish, &mut cmd, "d2o", &completions_dir)
         .expect("Failed to generate fish completion");
-    generate_to(Zsh, &mut cmd, "hcl", &completions_dir).expect("Failed to generate zsh completion");
-    generate_to(PowerShell, &mut cmd, "hcl", &completions_dir)
+    generate_to(Zsh, &mut cmd, "d2o", &completions_dir).expect("Failed to generate zsh completion");
+    generate_to(PowerShell, &mut cmd, "d2o", &completions_dir)
         .expect("Failed to generate powershell completion");
-    generate_to(Elvish, &mut cmd, "hcl", &completions_dir)
+    generate_to(Elvish, &mut cmd, "d2o", &completions_dir)
         .expect("Failed to generate elvish completion");
 
     // Generate nushell
-    generate_to(Nushell, &mut cmd, "hcl", &completions_dir)
+    generate_to(Nushell, &mut cmd, "d2o", &completions_dir)
         .expect("Failed to generate nushell completion");
 
     let man_dir = out_dir.join("man");

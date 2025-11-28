@@ -80,10 +80,10 @@ impl Cache {
         Ok(Self { cache_dir, ttl })
     }
 
-    /// Get the XDG-compliant cache directory for hcl.
+    /// Get the XDG-compliant cache directory for d2o.
     fn get_cache_dir() -> Result<PathBuf> {
         let project_dirs =
-            ProjectDirs::from("", "", "hcl").context("Failed to determine project directories")?;
+            ProjectDirs::from("", "", "d2o").context("Failed to determine project directories")?;
 
         let cache_dir = project_dirs.cache_dir().to_path_buf();
         std::fs::create_dir_all(&cache_dir).with_context(|| {

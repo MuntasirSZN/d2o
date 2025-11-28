@@ -1,9 +1,9 @@
 use clap::Parser as ClapParser;
 use ecow::{EcoString, eco_vec};
-use hcl::types::OptNameType;
-use hcl::{
+use d2o::types::OptNameType;
+use d2o::{
     BashGenerator, Cli, Command, ElvishGenerator, FishGenerator, NushellGenerator, Opt, OptName,
-    Parser as HclParser, ZshGenerator,
+    Parser as D2oParser, ZshGenerator,
 };
 
 #[test]
@@ -15,7 +15,7 @@ OPTIONS:
   -b, --escape              print C-style escapes for nongraphic characters
 "#;
 
-    let opts = HclParser::parse_line(ls_help);
+    let opts = D2oParser::parse_line(ls_help);
     insta::assert_yaml_snapshot!(opts.len());
 }
 
@@ -50,7 +50,7 @@ Options:
   -p, --publish list        Publish a container's port(s) to the host
 "#;
 
-    let opts = HclParser::parse_line(docker_help);
+    let opts = D2oParser::parse_line(docker_help);
     insta::assert_yaml_snapshot!(opts.len());
 }
 
@@ -101,17 +101,17 @@ fn test_nushell_generator_snapshot() {
 #[test]
 fn test_cli_short_f_and_conflicts() {
     // -f should work as shorthand for --file
-    let cli = Cli::try_parse_from(["hcl", "-f", "file.txt", "--format", "json"]).unwrap();
+    let cli = Cli::try_parse_from(["d2o", "-f", "file.txt", "--format", "json"]).unwrap();
     assert_eq!(cli.file.as_deref(), Some("file.txt"));
 
     // Conflicting flags should error
-    let res = Cli::try_parse_from(["hcl", "--command", "ls", "--file", "file.txt"]);
+    let res = Cli::try_parse_from(["d2o", "--command", "ls", "--file", "file.txt"]);
     assert!(res.is_err());
 }
 
 #[test]
 fn test_cli_effective_format_and_helpers() {
-    let cli = Cli::try_parse_from(["hcl", "--command", "ls", "--format", "bash"]).unwrap();
+    let cli = Cli::try_parse_from(["d2o", "--command", "ls", "--format", "bash"]).unwrap();
 
     // json flag off, effective_format should be underlying format
     assert_eq!(cli.effective_format(), "bash");
@@ -119,7 +119,7 @@ fn test_cli_effective_format_and_helpers() {
     assert!(!cli.is_preprocess_only());
 
     let cli_json =
-        Cli::try_parse_from(["hcl", "--command", "ls", "--format", "bash", "--json"]).unwrap();
+        Cli::try_parse_from(["d2o", "--command", "ls", "--format", "bash", "--json"]).unwrap();
 
     // json flag forces json format
     assert_eq!(cli_json.effective_format(), "json");

@@ -1,6 +1,6 @@
-# Contributing to hcl
+# Contributing to d2o
 
-Thank you for your interest in contributing to hcl! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to d2o! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -21,14 +21,14 @@ This project adheres to the Contributor Covenant [Code of Conduct](./CODE_OF_CON
 1. Clone your fork:
 
    ```bash
-   git clone https://github.com/MuntasirSZN/hcl.git
-   cd hcl
+   git clone https://github.com/MuntasirSZN/d2o.git
+   cd d2o
    ```
 
 1. Add upstream remote:
 
    ```bash
-   git remote add upstream https://github.com/MuntasirSZN/hcl.git
+   git remote add upstream https://github.com/MuntasirSZN/d2o.git
    ```
 
 1. Create a development branch:
@@ -70,7 +70,7 @@ cargo clippy -- -D warnings
 
 - Add unit tests for new functionality
 - Ensure all existing tests pass: `cargo test`
-- Test with real commands: `hcl --command <cmd> --format json`
+- Test with real commands: `d2o --command <cmd> --format json`
 - Include edge cases in tests
 
 Example test structure:
@@ -193,7 +193,7 @@ Example:
 # Build with profiling
 cargo build --release
 # Profile a command
-perf record ./target/release/hcl --command ls --format json
+perf record ./target/release/d2o --command ls --format json
 perf report
 ```
 
@@ -251,4 +251,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ______________________________________________________________________
 
-Thank you for helping make hcl better! 🚀
+Thank you for helping make d2o better! 🚀
