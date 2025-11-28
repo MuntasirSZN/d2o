@@ -67,14 +67,6 @@ jobs:
         run: cargo build
       - name: Run tests
         run: cargo nextest run --all-features
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        if: matrix.os == 'ubuntu-latest'
-        with:
-          use_oidc: true
-          files: target/nextest/default/junit.xml
-          fail_ci_if_error: false
-          report-type: test_results
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -88,6 +80,7 @@ jobs:
     name: Code Coverage
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Checkout
