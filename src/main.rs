@@ -2,12 +2,12 @@ use clap::{FromArgMatches, crate_name};
 use clap_complete::generate;
 use clap_complete::shells::{Bash, Elvish, Fish, PowerShell, Zsh};
 use clap_complete_nushell::Nushell;
-use ecow::EcoString;
 use d2o::{
     BashGenerator, Cache, Cli, Command, ElvishGenerator, FishGenerator, IoHandler, JsonGenerator,
     Layout, NushellGenerator, Postprocessor, Shell, SubcommandParser, ZshGenerator,
     command_with_version,
 };
+use ecow::EcoString;
 use std::io;
 use std::path::Path;
 use std::time::Duration;
@@ -313,8 +313,8 @@ async fn write_output_to_cache(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ecow::EcoVec;
     use d2o::cli::DEFAULT_CACHE_TTL_HOURS;
+    use ecow::EcoVec;
 
     /// Helper to create a default Cli for testing
     fn test_cli() -> Cli {

@@ -2,13 +2,13 @@
 //!
 //! Run with: cargo bench
 
-use divan::AllocProfiler;
-use divan::{Bencher, black_box};
-use ecow::{EcoString, EcoVec, eco_vec};
 use d2o::{
     BashGenerator, Command, ElvishGenerator, FishGenerator, JsonGenerator, Layout,
     NushellGenerator, Opt, OptName, OptNameType, Postprocessor, ZshGenerator,
 };
+use divan::AllocProfiler;
+use divan::{Bencher, black_box};
+use ecow::{EcoString, EcoVec, eco_vec};
 use mimalloc_safe::MiMalloc;
 
 #[cfg(not(any(target_arch = "arm", target_os = "freebsd")))]

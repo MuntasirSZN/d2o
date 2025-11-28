@@ -1,10 +1,10 @@
 use clap::Parser as ClapParser;
-use ecow::{EcoString, eco_vec};
 use d2o::types::OptNameType;
 use d2o::{
     BashGenerator, Cli, Command, ElvishGenerator, FishGenerator, NushellGenerator, Opt, OptName,
     Parser as D2oParser, ZshGenerator,
 };
+use ecow::{EcoString, eco_vec};
 
 #[test]
 fn test_parse_ls_help_snapshot() {
