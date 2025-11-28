@@ -50,6 +50,7 @@ jobs:
         run: |
           if [ "${{ matrix.use_cross }}" == "true" ]; then
             cargo install cross --git https://github.com/cross-rs/cross
+          fi
         shell: bash
       - name: Build
         run: |
