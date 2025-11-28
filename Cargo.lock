@@ -459,6 +459,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "d2o"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "anyhow",
+ "argfile",
+ "ascii",
+ "assert_cmd",
+ "bstr",
+ "bytecount",
+ "clap",
+ "clap-verbosity-flag",
+ "clap_complete",
+ "clap_complete_nushell",
+ "clap_mangen",
+ "codspeed-divan-compat",
+ "directories",
+ "ecow",
+ "foldhash",
+ "insta",
+ "memchr",
+ "mimalloc-safe",
+ "predicates",
+ "proptest",
+ "rayon",
+ "regex",
+ "regex-automata",
+ "scc",
+ "serde",
+ "serde_json",
+ "shadow-rs",
+ "simdutf8",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "deranged"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,45 +710,6 @@ name = "hashbrown"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
-
-[[package]]
-name = "d2o"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "argfile",
- "ascii",
- "assert_cmd",
- "bstr",
- "bytecount",
- "clap",
- "clap-verbosity-flag",
- "clap_complete",
- "clap_complete_nushell",
- "clap_mangen",
- "codspeed-divan-compat",
- "directories",
- "ecow",
- "foldhash",
- "insta",
- "memchr",
- "mimalloc-safe",
- "predicates",
- "proptest",
- "rayon",
- "regex",
- "regex-automata",
- "scc",
- "serde",
- "serde_json",
- "shadow-rs",
- "simdutf8",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "heck"
