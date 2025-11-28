@@ -7,7 +7,7 @@ documentation = "https://github.com/MuntasirSZN/hcl"
 readme = "README.md"
 repository = "https://github.com/MuntasirSZN/hcl"
 license = "MIT"
-keywords = ["cli", "completion", "help", "manpage", "parser", "shell"]
+keywords = ["cli", "completion", "help", "manpage", "shell"]
 categories = ["command-line-utilities", "parsing"]
 build = "build.rs"
 
