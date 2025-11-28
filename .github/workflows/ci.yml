@@ -63,8 +63,6 @@ jobs:
           channel: stable
           cache-target: test
           bins: cargo-nextest
-      - name: Build
-        run: cargo build
       - name: Run tests
         run: cargo nextest run --all-features
   audit:
