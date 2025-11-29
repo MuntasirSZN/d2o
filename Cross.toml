@@ -1,5 +1,0 @@
-[target.aarch64-unknown-linux-gnu]
-zig = "2.17"
-
-[target.x86_64-unknown-linux-gnu]
-zig = "2.17"

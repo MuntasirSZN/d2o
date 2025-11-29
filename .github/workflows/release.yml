@@ -7,33 +7,31 @@ env:
   RUST_BACKTRACE: 1
 jobs:
   build-matrix:
-    name: Build ${{ matrix.build }}
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     strategy:
       matrix:
         include:
-          - build: linux-gnu
-            os: ubuntu-latest
+          - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            use_cross: false
-          - build: linux-musl
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            use_cross: true
-          - build: macos-intel
-            os: macos-15-intel
+            zigbuild: false
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            zigbuild: true
+          - os: macos-15-intel
             target: x86_64-apple-darwin
-            use_cross: false
-          - build: macos-arm
-            os: macos-latest
+            zigbuild: true
+          - os: macos-latest
             target: aarch64-apple-darwin
-            use_cross: false
-          - build: windows-msvc
-            os: windows-latest
+            zigbuild: true
+          - os: windows-latest
             target: x86_64-pc-windows-msvc
-            use_cross: false
+            zigbuild: false
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            zigbuild: false
     steps:
       - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
@@ -42,20 +40,15 @@ jobs:
         uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670 # v1.2.2
         with:
           channel: stable
+          bins: cargo-zigbuild
       - name: Install zig
         uses: mlugg/setup-zig@fa65c4058643678a4e4a9a60513944a7d8d35440 # v2.1.0
         with:
           version: 0.15.2
-      - name: Install cross (git)
-        run: |
-          if [ "${{ matrix.use_cross }}" == "true" ]; then
-            cargo install cross --git https://github.com/cross-rs/cross
-          fi
-        shell: bash
       - name: Build
         run: |
-          if [ "${{ matrix.use_cross }}" == "true" ]; then
-            cross build --release --target ${{ matrix.target }}
+          if [ "${{ matrix.zigbuild }}" == "true" ]; then
+            cargo zigbuild --release --target ${{ matrix.target }}.2.17
           else
             cargo build --release --target ${{ matrix.target }}
           fi
@@ -63,28 +56,28 @@ jobs:
       - name: Create package (Unix)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p d2o-${{ matrix.build }}
-          cp target/${{ matrix.target }}/release/d2o d2o-${{ matrix.build }}/
-          cp -r completions man d2o-${{ matrix.build }}/ 2>/dev/null || true
-          cp README.md LICENSE d2o-${{ matrix.build }}/
-          tar -czf d2o-${{ matrix.build }}.tar.gz d2o-${{ matrix.build }}/
+          mkdir -p d2o-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/d2o d2o-${{ matrix.target }}/
+          cp -r completions man d2o-${{ matrix.target }}/ 2>/dev/null || true
+          cp README.md LICENSE d2o-${{ matrix.target }}/
+          tar -czf d2o-${{ matrix.target }}.tar.gz d2o-${{ matrix.target }}/
         shell: bash
       - name: Create package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "d2o-${{ matrix.build }}" -Force
-          Copy-Item "target/${{ matrix.target }}/release/d2o.exe" "d2o-${{ matrix.build }}/"
-          Copy-Item "completions", "man" "d2o-${{ matrix.build }}/" -Recurse -Force -ErrorAction SilentlyContinue
-          Copy-Item "README.md", "LICENSE" "d2o-${{ matrix.build }}/"
-          Compress-Archive -Path "d2o-${{ matrix.build }}" -DestinationPath "d2o-${{ matrix.build }}.zip" -Force
+          New-Item -ItemType Directory -Path "d2o-${{ matrix.target }}" -Force
+          Copy-Item "target/${{ matrix.target }}/release/d2o.exe" "d2o-${{ matrix.target }}/"
+          Copy-Item "completions", "man" "d2o-${{ matrix.target }}/" -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item "README.md", "LICENSE" "d2o-${{ matrix.target }}/"
+          Compress-Archive -Path "d2o-${{ matrix.target }}" -DestinationPath "d2o-${{ matrix.target }}.zip" -Force
       - name: Upload artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: d2o-${{ matrix.build }}
+          name: d2o-${{ matrix.target }}
           path: |
-            d2o-${{ matrix.build }}.tar.gz
-            d2o-${{ matrix.build }}.zip
+            d2o-${{ matrix.target }}.tar.gz
+            d2o-${{ matrix.target }}.zip
   create-release:
     name: Create Release
     needs: build-matrix
