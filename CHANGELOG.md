@@ -1,5 +1,6 @@
 ## v0.1.0
 
+
 ### 🚀 Enhancements
 
 - Improve shell generators and CLI tests ([3665e61](https://github.com/MuntasirSZN/d2o/commit/3665e61))
@@ -14,6 +15,7 @@
 ### 🩹 Fixes
 
 - **tests:** Use USERPROFILE env on windows ([7a8b79e](https://github.com/MuntasirSZN/d2o/commit/7a8b79e))
+- Workflow does not contain permissions ([3fad2ee](https://github.com/MuntasirSZN/d2o/commit/3fad2ee))
 
 ### 📖 Documentation
 
@@ -31,12 +33,29 @@
 - Benches ([dd4409d](https://github.com/MuntasirSZN/d2o/commit/dd4409d))
 - Benches fix ([4f822b0](https://github.com/MuntasirSZN/d2o/commit/4f822b0))
 - Change keywords ([565fc35](https://github.com/MuntasirSZN/d2o/commit/565fc35))
+- Add changelog ([370c126](https://github.com/MuntasirSZN/d2o/commit/370c126))
+- Rename ([6106d1a](https://github.com/MuntasirSZN/d2o/commit/6106d1a))
+- Lockfile ([ac6289b](https://github.com/MuntasirSZN/d2o/commit/ac6289b))
+- Fix issues ([e6b6b5d](https://github.com/MuntasirSZN/d2o/commit/e6b6b5d))
+- Fix issues ([489bea1](https://github.com/MuntasirSZN/d2o/commit/489bea1))
+- Fix issues ([275386b](https://github.com/MuntasirSZN/d2o/commit/275386b))
+- Last fix ([7e7748d](https://github.com/MuntasirSZN/d2o/commit/7e7748d))
+- Fix issues ([29d8af9](https://github.com/MuntasirSZN/d2o/commit/29d8af9))
+- Remove verbosity ([e1e3046](https://github.com/MuntasirSZN/d2o/commit/e1e3046))
+- Fix finale ([fa2e868](https://github.com/MuntasirSZN/d2o/commit/fa2e868))
+- Fix finale again ([75baf95](https://github.com/MuntasirSZN/d2o/commit/75baf95))
 
 ### 🤖 CI
 
 - Fix some issues ([02e6962](https://github.com/MuntasirSZN/d2o/commit/02e6962))
 - **benches:** Toooo noisy ([8e8bfcb](https://github.com/MuntasirSZN/d2o/commit/8e8bfcb))
+- Build in one go ([6bfbac0](https://github.com/MuntasirSZN/d2o/commit/6bfbac0))
+- Throw oidc in trashcan ([5e5e3c7](https://github.com/MuntasirSZN/d2o/commit/5e5e3c7))
+- Update CI workflow by removing schedule and versioning ([5bcebff](https://github.com/MuntasirSZN/d2o/commit/5bcebff))
 
 ### ❤️ Contributors
 
 - MuntasirSZN ([@MuntasirSZN](https://github.com/MuntasirSZN))
+- Muntasir Mahmud ([@MuntasirSZN](https://github.com/MuntasirSZN))
+
+
