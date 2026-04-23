@@ -95,10 +95,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
-        with:
-          body_path: changelog.md
-          files: release-assets/*
+        run: |
+         gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+           && gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber \
+           || gh release create "$GITHUB_REF_NAME" --notes-file changelog.md release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   publish-crates-io:
