@@ -1,6 +1,6 @@
 [package]
 name = "d2o"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Help to Options - Parse help or manpage texts and generate shell completion scripts"
 documentation = "https://github.com/MuntasirSZN/d2o"
