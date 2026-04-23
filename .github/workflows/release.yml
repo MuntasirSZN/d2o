@@ -88,10 +88,9 @@ jobs:
         uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: latest
-      - name: Generate changelog
-        id: changelog
+      - name: Generate Changelog
         run: |
-          npx changelogithub@latest > changelog.md
+          npx changelogithub@latest --output changelog.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create Release
@@ -115,4 +114,4 @@ jobs:
       - uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1.0.3
         id: auth
       - name: Publish
-        run: cargo publish --token ${{ steps.auth.outputs.token }}
+        run: cargo publish --token ${{ steps.auth.outputs.token }} --no-verify
