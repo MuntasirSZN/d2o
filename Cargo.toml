@@ -18,11 +18,11 @@ name = "parsing"
 [dependencies]
 aho-corasick = "1.1"
 anyhow = "1.0"
-argfile = "0.2.1"
+argfile = "1.0.0"
 bstr = "1.12"
-clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-clap_complete = "4.5"
-clap_complete_nushell = "4.5"
+clap = { version = "4.6", features = ["cargo", "derive", "env"] }
+clap_complete = "4.6"
+clap_complete_nushell = "4.6"
 clap-verbosity-flag = { version = "3.0", default-features = false, features = [
   "tracing"
 ] }
@@ -30,13 +30,13 @@ directories = "6.0"
 ecow = { version = "0.2", features = ["serde"] }
 foldhash = "0.2.0"
 memchr = "2.8"
-rayon = "1.11"
+rayon = "1.12"
 regex = "1.12"
 scc = "3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-shadow-rs = { version = "1.7", default-features = false }
-tokio = { version = "1.49", features = [
+shadow-rs = { version = "2.0", default-features = false }
+tokio = { version = "1.52", features = [
   "fs",
   "io-util",
   "macros",
@@ -47,13 +47,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [dev-dependencies]
-assert_cmd = "2.1"
-divan = { package = "codspeed-divan-compat", version = "4.1" }
-insta = { version = "1.46", features = ["redactions", "yaml"] }
+assert_cmd = "2.2"
+divan = { package = "codspeed-divan-compat", version = "4.5" }
+insta = { version = "1.47", features = ["redactions", "yaml"] }
 predicates = "3.1"
-proptest = "1.10"
-tempfile = "3.25"
-tokio = { version = "1.49", features = [
+proptest = "1.11"
+tempfile = "3.27"
+tokio = { version = "1.52", features = [
   "fs",
   "io-util",
   "macros",
@@ -62,24 +62,24 @@ tokio = { version = "1.49", features = [
 ] }
 
 [build-dependencies]
-clap = { version = "4.5", features = ["cargo", "derive"] }
-clap_complete = "4.5"
-clap_complete_nushell = "4.5"
-clap_mangen = "0.2"
+clap = { version = "4.6", features = ["cargo", "derive"] }
+clap_complete = "4.6"
+clap_complete_nushell = "4.6"
+clap_mangen = "0.3"
 clap-verbosity-flag = { version = "3.0", default-features = false, features = [
   "tracing"
 ] }
-shadow-rs = "1.7"
+shadow-rs = "2.0"
 
 [target.'cfg(all(target_os = "linux", not(target_arch = "arm"), not(target_arch = "aarch64")))'.dependencies]
-mimalloc-safe = { version = "0.1.56", features = [
+mimalloc-safe = { version = "0.1.57", features = [
   "extended",
   "local_dynamic_tls",
   "skip_collect_on_exit"
 ] }
 
 [target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
-mimalloc-safe = { version = "0.1.56", features = [
+mimalloc-safe = { version = "0.1.57", features = [
   "extended",
   "local_dynamic_tls",
   "no_opt_arch",
@@ -87,7 +87,7 @@ mimalloc-safe = { version = "0.1.56", features = [
 ] }
 
 [target.'cfg(not(any(target_os = "linux", target_os = "freebsd", target_arch = "arm")))'.dependencies]
-mimalloc-safe = { version = "0.1.56", features = [
+mimalloc-safe = { version = "0.1.57", features = [
   "extended",
   "skip_collect_on_exit"
 ] }
