@@ -213,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.6.2"
+version = "4.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff7a1dccbdd8b078c2bdebff47e404615151534d5043da397ec50286816f9cb"
+checksum = "660c0520455b1013b9bcb0393d5f643d7e4454fb69c915b8d6d2aa0e9a45acc3"
 dependencies = [
  "clap",
 ]
@@ -966,9 +966,9 @@ dependencies = [
 
 [[package]]
 name = "libmimalloc-sys2"
-version = "0.1.53"
+version = "0.1.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f63621f3ea5148a9f2bc0ea8279199d47ddcf29bea01da1937341c0390145cc"
+checksum = "8a59567f2add52cb5a14b97e11ba4a20239fb93402fa99173347cbb689cd5330"
 dependencies = [
  "cc",
  "cmake",
@@ -1032,9 +1032,9 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "mimalloc-safe"
-version = "0.1.57"
+version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39cc187ef1246f28818831593a635a9591a81d784f8636a857c76fd5d36376fd"
+checksum = "a8bf95a709c09e85ae74e77b2413cbb11a1b8f2f3d11e23b3751382467c9c15c"
 dependencies = [
  "libmimalloc-sys2",
 ]
