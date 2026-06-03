@@ -72,14 +72,14 @@ clap-verbosity-flag = { version = "3.0", default-features = false, features = [
 shadow-rs = "2.0"
 
 [target.'cfg(all(target_os = "linux", not(target_arch = "arm"), not(target_arch = "aarch64")))'.dependencies]
-mimalloc-safe = { version = "0.1.58", features = [
+mimalloc-safe = { version = "0.1.61", features = [
   "extended",
   "local_dynamic_tls",
   "skip_collect_on_exit"
 ] }
 
 [target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
-mimalloc-safe = { version = "0.1.58", features = [
+mimalloc-safe = { version = "0.1.61", features = [
   "extended",
   "local_dynamic_tls",
   "no_opt_arch",
@@ -87,7 +87,7 @@ mimalloc-safe = { version = "0.1.58", features = [
 ] }
 
 [target.'cfg(not(any(target_os = "linux", target_os = "freebsd", target_arch = "arm")))'.dependencies]
-mimalloc-safe = { version = "0.1.58", features = [
+mimalloc-safe = { version = "0.1.61", features = [
   "extended",
   "skip_collect_on_exit"
 ] }
