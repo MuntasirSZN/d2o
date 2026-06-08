@@ -27,7 +27,7 @@ clap-verbosity-flag = { version = "3.0", default-features = false, features = [
   "tracing"
 ] }
 directories = "6.0"
-ecow = { version = "0.2", features = ["serde"] }
+ecow = { version = "0.3", features = ["serde"] }
 foldhash = "0.2.0"
 memchr = "2.8"
 rayon = "1.12"
